@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">estid-fashion.myshopify.com</domain>
+        <domain includeSubdomains="true">estid-fashion.de</domain>
+        <domain includeSubdomains="true">cdn.shopify.com</domain>
+    </domain-config>
+</network-security-config>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ESTID Fashion Splash Logo – goldenes Diamant-Symbol -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#C9A84C"
+        android:pathData="M54,18 L72,36 L54,90 L36,36 Z" />
+    <path
+        android:fillColor="#E8C97A"
+        android:pathData="M54,18 L36,36 L54,42 Z" />
+    <path
+        android:fillColor="#A07830"
+        android:pathData="M54,18 L72,36 L54,42 Z" />
+    <path
+        android:fillColor="#B89040"
+        android:pathData="M36,36 L54,42 L54,90 Z" />
+    <path
+        android:fillColor="#D4AA60"
+        android:pathData="M72,36 L54,42 L54,90 Z" />
+</vector>

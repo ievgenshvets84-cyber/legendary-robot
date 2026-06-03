@@ -1,0 +1,6 @@
+-keep class de.estidfashion.app.data.models.** { *; }
+-keep class de.estidfashion.app.data.api.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
