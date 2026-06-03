@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESTID Fashion – Google App</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #1a73e8;
+      --success: #34a853;
+      --warn: #fbbc04;
+      --danger: #ea4335;
+      --dark: #202124;
+      --gray: #5f6368;
+      --light: #f8f9fa;
+      --border: #dadce0;
+      --radius: 8px;
+    }
+    body {
+      font-family: 'Google Sans', Roboto, Arial, sans-serif;
+      background: var(--light);
+      color: var(--dark);
+      min-height: 100vh;
+    }
+    header {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600; color: var(--dark); }
+    .logo svg { width: 28px; height: 28px; }
+    .badge { background: #e8f0fe; color: var(--primary); font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 12px; }
+    nav { margin-left: auto; display: flex; gap: 8px; }
+    nav a { text-decoration: none; color: var(--gray); font-size: 14px; padding: 6px 12px; border-radius: var(--radius); transition: background .15s; }
+    nav a:hover, nav a.active { background: #e8f0fe; color: var(--primary); }
+    main { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+    h2 { font-size: 22px; margin-bottom: 20px; color: var(--dark); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+    }
+    .card-title { font-size: 12px; color: var(--gray); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+    .card-value { font-size: 32px; font-weight: 700; color: var(--dark); }
+    .card-sub { font-size: 13px; color: var(--gray); margin-top: 4px; }
+    .card.primary { border-left: 4px solid var(--primary); }
+    .card.success { border-left: 4px solid var(--success); }
+    .card.warn { border-left: 4px solid var(--warn); }
+    .section { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; }
+    .section h3 { font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--primary); color: #fff;
+      border: none; border-radius: var(--radius);
+      padding: 10px 20px; font-size: 14px; font-weight: 500;
+      cursor: pointer; text-decoration: none; transition: opacity .15s;
+    }
+    .btn:hover { opacity: .9; }
+    .btn.secondary { background: #fff; color: var(--primary); border: 1px solid var(--primary); }
+    .btn.success-btn { background: var(--success); }
+    .btn.danger { background: var(--danger); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .feed-url {
+      background: #f1f3f4; border-radius: var(--radius);
+      padding: 12px 16px; font-family: monospace; font-size: 13px;
+      color: var(--dark); word-break: break-all; margin-bottom: 12px;
+      border: 1px solid var(--border);
+    }
+    .steps { counter-reset: step; list-style: none; }
+    .steps li { counter-increment: step; display: flex; gap: 16px; margin-bottom: 20px; align-items: flex-start; }
+    .steps li::before {
+      content: counter(step);
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; flex-shrink: 0; margin-top: 2px;
+    }
+    .steps li .step-content strong { display: block; margin-bottom: 4px; }
+    .steps li .step-content p { font-size: 14px; color: var(--gray); }
+    .steps li .step-content a { color: var(--primary); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; padding: 10px 12px; background: var(--light); border-bottom: 2px solid var(--border); font-size: 12px; text-transform: uppercase; color: var(--gray); }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    .product-img { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; border: 1px solid var(--border); }
+    .tag { display: inline-block; background: #e8f0fe; color: var(--primary); border-radius: 4px; font-size: 11px; padding: 2px 6px; }
+    .status-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
+    .status-badge.ok::before { content: '●'; color: var(--success); }
+    .status-badge.warn::before { content: '●'; color: var(--warn); }
+    .alert { padding: 12px 16px; border-radius: var(--radius); font-size: 14px; margin-bottom: 16px; display: none; }
+    .alert.success { background: #e6f4ea; color: #1e6b3a; border: 1px solid #a8d5b5; }
+    .alert.error { background: #fce8e6; color: #c62828; border: 1px solid #f5c6c6; }
+    #loading { text-align: center; padding: 40px; color: var(--gray); }
+    .copy-btn { background: none; border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; color: var(--gray); margin-left: 8px; }
+    .copy-btn:hover { background: var(--light); }
+    .env-table { font-family: monospace; font-size: 13px; }
+    .env-table td:first-child { color: var(--primary); font-weight: 600; }
+    .env-table td:last-child { color: var(--gray); font-size: 12px; }
+    @media (max-width: 600px) { .grid { grid-template-columns: 1fr 1fr; } main { padding: 16px; } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#1a73e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    ESTID Fashion
+    <span class="badge">Google App</span>
+  </div>
+  <nav>
+    <a href="#overview" class="active" onclick="showTab('overview',this)">Übersicht</a>
+    <a href="#products" onclick="showTab('products',this)">Produkte</a>
+    <a href="#feed" onclick="showTab('feed',this)">Feed</a>
+    <a href="#setup" onclick="showTab('setup',this)">Einrichtung</a>
+  </nav>
+</header>
+
+<main>
+  <!-- OVERVIEW -->
+  <div id="tab-overview">
+    <h2>Übersicht</h2>
+    <div id="loading">Lade Shop-Daten…</div>
+    <div id="overview-content" style="display:none">
+      <div class="grid">
+        <div class="card primary">
+          <div class="card-title">Produkte im Shop</div>
+          <div class="card-value" id="stat-products">–</div>
+          <div class="card-sub">ESTID Fashion</div>
+        </div>
+        <div class="card success">
+          <div class="card-title">Feed-Status</div>
+          <div class="card-value" style="font-size:18px;margin-top:6px" id="stat-feed">Aktiv</div>
+          <div class="card-sub" id="stat-feed-sub">–</div>
+        </div>
+        <div class="card warn">
+          <div class="card-title">Merchant Center</div>
+          <div class="card-value" style="font-size:18px;margin-top:6px" id="stat-merchant">–</div>
+          <div class="card-sub" id="stat-merchant-sub">–</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Shop</div>
+          <div class="card-value" style="font-size:14px;margin-top:8px"><a href="https://www.estid-fashion.de" target="_blank">estid-fashion.de</a></div>
+          <div class="card-sub">Basic Plan · EUR · DE</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>🔗 Deine Google Shopping Feed-URL</h3>
+        <p style="font-size:14px;color:var(--gray);margin-bottom:12px">Diese URL trägst du bei Google Merchant Center unter <strong>Produkte → Feeds</strong> ein:</p>
+        <div class="feed-url" id="feed-url-display">Lade…</div>
+        <button class="btn secondary" onclick="copyFeedUrl()">📋 URL kopieren</button>
+        <a class="btn" id="feed-preview-btn" href="#" target="_blank" style="margin-left:8px">🔍 Feed öffnen</a>
+      </div>
+
+      <div class="section">
+        <h3>⚡ Aktionen</h3>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <button class="btn" onclick="refreshFeed()">🔄 Feed aktualisieren</button>
+          <button class="btn success-btn" onclick="syncMerchant()" id="sync-btn">☁️ Zu Google Merchant syncen</button>
+          <button class="btn secondary" onclick="clearCache()">🗑️ Cache leeren</button>
+        </div>
+        <div class="alert success" id="action-success"></div>
+        <div class="alert error" id="action-error"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRODUCTS -->
+  <div id="tab-products" style="display:none">
+    <h2>Produkte im Shop</h2>
+    <div style="margin-bottom:16px">
+      <button class="btn secondary" onclick="loadProducts()">🔄 Aktualisieren</button>
+    </div>
+    <div class="section">
+      <table>
+        <thead>
+          <tr>
+            <th>Bild</th>
+            <th>Produkt</th>
+            <th>Typ</th>
+            <th>SKU</th>
+            <th>Preis</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="product-table-body">
+          <tr><td colspan="6" style="text-align:center;color:var(--gray);padding:32px">Klicke auf Aktualisieren…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FEED -->
+  <div id="tab-feed" style="display:none">
+    <h2>Google Shopping Feed</h2>
+    <div class="section">
+      <h3>📄 Feed-Vorschau (erste 5000 Zeichen)</h3>
+      <button class="btn secondary" onclick="loadFeedPreview()" style="margin-bottom:16px">🔍 Feed laden</button>
+      <div id="feed-preview-box" style="background:#f1f3f4;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;white-space:pre;overflow:auto;max-height:500px;border:1px solid var(--border);color:#333">
+        Klicke auf "Feed laden"…
+      </div>
+    </div>
+    <div class="section">
+      <h3>ℹ️ Feed-Format</h3>
+      <table class="env-table">
+        <tr><td>Format</td><td>RSS 2.0 mit Google Base Namespace</td><td>Google Merchant Center Standard</td></tr>
+        <tr><td>Sprache</td><td>de-DE</td><td>Deutsch für DE-Markt</td></tr>
+        <tr><td>Währung</td><td>EUR</td><td>Euro</td></tr>
+        <tr><td>Versand</td><td>4,95 € Standardversand DE</td><td>Anpassbar in .env</td></tr>
+        <tr><td>Update</td><td>Automatisch alle 30 Min</td><td>Über node-cron</td></tr>
+        <tr><td>Cache TTL</td><td>30 Minuten</td><td>Reduziert Shopify API-Calls</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- SETUP -->
+  <div id="tab-setup" style="display:none">
+    <h2>Einrichtung – Schritt für Schritt</h2>
+
+    <div class="section">
+      <h3>🔧 Umgebungsvariablen (.env)</h3>
+      <p style="font-size:14px;color:var(--gray);margin-bottom:16px">Erstelle eine <code>.env</code> Datei im Projektordner:</p>
+      <table class="env-table">
+        <tr><th>Variable</th><th>Beschreibung</th><th>Pflicht</th></tr>
+        <tr><td>SHOPIFY_STORE_URL</td><td>z.B. estid-fashion.myshopify.com</td><td><span class="tag">Ja</span></td></tr>
+        <tr><td>SHOPIFY_ACCESS_TOKEN</td><td>Admin API Token aus Shopify → Apps → Eigene Apps</td><td><span class="tag">Ja</span></td></tr>
+        <tr><td>SHOPIFY_API_VERSION</td><td>z.B. 2024-01 (Standard)</td><td>Optional</td></tr>
+        <tr><td>GOOGLE_MERCHANT_ID</td><td>Deine Merchant Center ID (nur für API-Sync)</td><td>Optional</td></tr>
+        <tr><td>GOOGLE_CLIENT_ID</td><td>OAuth Client ID von Google Cloud Console</td><td>Optional</td></tr>
+        <tr><td>GOOGLE_CLIENT_SECRET</td><td>OAuth Client Secret</td><td>Optional</td></tr>
+        <tr><td>GOOGLE_REFRESH_TOKEN</td><td>OAuth Refresh Token</td><td>Optional</td></tr>
+        <tr><td>APP_URL</td><td>Öffentliche URL der App (z.B. https://deineapp.railway.app)</td><td>Optional</td></tr>
+        <tr><td>PORT</td><td>Server-Port (Standard: 3000)</td><td>Optional</td></tr>
+        <tr><td>SHOP_DOMAIN</td><td>https://www.estid-fashion.de</td><td>Optional</td></tr>
+      </table>
+    </div>
+
+    <div class="section">
+      <h3>📋 Shopify Access Token erstellen</h3>
+      <ol class="steps">
+        <li>
+          <div class="step-content">
+            <strong>Shopify Admin öffnen</strong>
+            <p>Geh zu <a href="https://admin.shopify.com" target="_blank">admin.shopify.com</a> → Einstellungen → Apps und Vertriebskanäle</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <strong>Eigene App erstellen</strong>
+            <p>Klicke auf "Apps entwickeln" → "App erstellen" → Name: "Google App"</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <strong>API-Berechtigungen setzen</strong>
+            <p>Wähle: <code>read_products</code>, <code>read_inventory</code>, <code>read_orders</code> (mindestens)</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <strong>Token kopieren</strong>
+            <p>Klicke auf "App installieren" → kopiere den <strong>Admin API access token</strong></p>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="section">
+      <h3>🛒 Google Merchant Center einrichten</h3>
+      <ol class="steps">
+        <li>
+          <div class="step-content">
+            <strong>Konto erstellen</strong>
+            <p>Geh zu <a href="https://merchants.google.com" target="_blank">merchants.google.com</a> und erstelle ein Konto für estid-fashion.de</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <strong>Shop-URL verifizieren</strong>
+            <p>Verifiziere www.estid-fashion.de (über HTML-Tag, DNS oder Google Analytics)</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <strong>Feed hinzufügen</strong>
+            <p>Geh zu <strong>Produkte → Feeds → Primären Feed hinzufügen</strong><br/>
+            Ziel: Deutschland · Sprache: Deutsch · Typ: URL abrufen<br/>
+            URL: <code id="setup-feed-url">https://deine-app.com/feed/google-shopping.xml</code></p>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <strong>Feed-Abruf planen</strong>
+            <p>Stelle den Abruf auf "täglich" ein – die App aktualisiert den Feed automatisch alle 30 Minuten</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <strong>Google Ads verknüpfen (optional)</strong>
+            <p>Verknüpfe dein Google Ads Konto für Shopping-Kampagnen unter <strong>Einstellungen → Verknüpfte Konten</strong></p>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="section">
+      <h3>🚀 App deployen (Empfehlung: Railway)</h3>
+      <ol class="steps">
+        <li>
+          <div class="step-content">
+            <strong>Repository pushen</strong>
+            <p>Den Code auf GitHub laden und bei <a href="https://railway.app" target="_blank">railway.app</a> importieren</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <strong>Umgebungsvariablen setzen</strong>
+            <p>In Railway unter "Variables" alle .env-Werte eintragen</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <strong>Öffentliche URL kopieren</strong>
+            <p>Railway gibt dir eine URL wie <code>https://estid-google.up.railway.app</code> – diese als APP_URL setzen</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </div>
+</main>
+
+<script>
+  const API = '';
+
+  function showTab(name, el) {
+    document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+    document.getElementById('tab-' + name).style.display = '';
+    document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+    if (el) el.classList.add('active');
+    if (name === 'products') loadProducts();
+  }
+
+  async function loadStatus() {
+    try {
+      const res = await fetch(API + '/api/status');
+      const data = await res.json();
+      const feedUrl = data.feedUrl;
+      document.getElementById('feed-url-display').textContent = feedUrl;
+      document.getElementById('feed-preview-btn').href = feedUrl;
+      document.getElementById('setup-feed-url').textContent = feedUrl;
+      document.getElementById('stat-feed-sub').textContent = 'Cache: ' + data.cacheAlter;
+      document.getElementById('stat-merchant').textContent = data.merchantId !== 'nicht konfiguriert' ? 'Verbunden' : 'Nicht eingerichtet';
+      document.getElementById('stat-merchant-sub').textContent = data.merchantId !== 'nicht konfiguriert' ? 'ID: ' + data.merchantId : 'Siehe Einrichtung';
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function loadProductCount() {
+    try {
+      const res = await fetch(API + '/api/products');
+      const data = await res.json();
+      document.getElementById('stat-products').textContent = data.count;
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('overview-content').style.display = '';
+    } catch (e) {
+      document.getElementById('loading').textContent = 'Fehler beim Laden (Shopify nicht konfiguriert?)';
+    }
+  }
+
+  async function loadProducts() {
+    const tbody = document.getElementById('product-table-body');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:32px">Lade Produkte…</td></tr>';
+    try {
+      const res = await fetch(API + '/api/products');
+      const data = await res.json();
+      if (!data.products || data.products.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:32px">Keine Produkte gefunden</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.products.map(p => {
+        const v = p.variants?.edges?.[0]?.node || {};
+        const img = p.featuredImage?.url || '';
+        const price = v.price ? parseFloat(v.price).toFixed(2) + ' €' : '–';
+        return `<tr>
+          <td>${img ? `<img src="${img}" class="product-img" loading="lazy" />` : '–'}</td>
+          <td><strong>${esc(p.title)}</strong><br/><small style="color:var(--gray)">${esc(p.handle)}</small></td>
+          <td><span class="tag">${esc(p.productType || '–')}</span></td>
+          <td style="font-family:monospace">${esc(v.sku || '–')}</td>
+          <td>${price}</td>
+          <td><span class="status-badge ok">${p.status}</span></td>
+        </tr>`;
+      }).join('');
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="6" style="color:var(--danger);padding:32px;text-align:center">Fehler: ${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  async function loadFeedPreview() {
+    const box = document.getElementById('feed-preview-box');
+    box.textContent = 'Lade Feed…';
+    try {
+      const res = await fetch(API + '/api/feed-preview');
+      const data = await res.json();
+      box.textContent = data.xml || data.error || 'Kein Feed';
+    } catch (e) {
+      box.textContent = 'Fehler: ' + e.message;
+    }
+  }
+
+  async function refreshFeed() {
+    showAlert('success', '🔄 Feed wird aktualisiert…');
+    try {
+      const res = await fetch(API + '/api/feed-preview');
+      const data = await res.json();
+      if (data.generatedAt) showAlert('success', '✅ Feed aktualisiert um ' + new Date(data.generatedAt).toLocaleTimeString('de'));
+    } catch (e) { showAlert('error', 'Fehler: ' + e.message); }
+  }
+
+  async function syncMerchant() {
+    const btn = document.getElementById('sync-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Synchronisiere…';
+    showAlert('success', 'Synchronisierung läuft…');
+    try {
+      const res = await fetch(API + '/api/merchant/sync', { method: 'POST' });
+      const data = await res.json();
+      if (data.error) showAlert('error', data.error);
+      else showAlert('success', `✅ Sync abgeschlossen: ${data.success} erfolgreich, ${data.failed} Fehler`);
+    } catch (e) { showAlert('error', 'Fehler: ' + e.message); }
+    btn.disabled = false;
+    btn.textContent = '☁️ Zu Google Merchant syncen';
+  }
+
+  async function clearCache() {
+    await fetch(API + '/api/cache/clear', { method: 'POST' });
+    showAlert('success', '✅ Cache geleert – nächster Feed-Aufruf holt frische Daten');
+    loadStatus();
+  }
+
+  function copyFeedUrl() {
+    const url = document.getElementById('feed-url-display').textContent;
+    navigator.clipboard.writeText(url).then(() => showAlert('success', '✅ URL kopiert!'));
+  }
+
+  function showAlert(type, msg) {
+    ['success', 'error'].forEach(t => {
+      const el = document.getElementById('action-' + t);
+      if (el) { el.style.display = 'none'; el.textContent = ''; }
+    });
+    const el = document.getElementById('action-' + type);
+    if (el) { el.textContent = msg; el.style.display = 'block'; }
+    setTimeout(() => { if (el) el.style.display = 'none'; }, 6000);
+  }
+
+  function esc(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Init
+  loadStatus();
+  loadProductCount();
+</script>
+</body>
+</html>
