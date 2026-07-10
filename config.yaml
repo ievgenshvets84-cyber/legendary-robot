@@ -1,0 +1,32 @@
+# Конфигурация LocalMind. Все значения имеют разумные умолчания в config.py —
+# этот файл нужен, только чтобы что-то переопределить.
+
+llm:
+  host: http://localhost:11434      # адрес локального Ollama
+  model: qwen2.5:7b-instruct        # открытая модель (llama3.1, mistral, gemma2 …)
+  embed_model: nomic-embed-text     # модель эмбеддингов для семантической памяти
+  temperature: 0.3
+  num_ctx: 8192
+  timeout: 300
+
+agent:
+  max_steps: 12                     # предел итераций рассуждение→действие
+  verbose: true
+
+memory:
+  path: state/memory.jsonl
+  top_k: 5
+  min_score: 0.15
+
+autonomy:
+  require_approval: true            # ПРЕДОХРАНИТЕЛЬ: новые навыки ждут одобрения человека
+  max_cycles: 25
+  goal_file: state/goals.md
+
+safety:
+  workspace: .                      # песочница файловых операций и навыков
+  allow_shell: false                # произвольный shell выключен
+  sandbox_timeout: 20               # секунд на исполнение кода/навыка
+
+skills:
+  dir: localmind/skills

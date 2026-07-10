@@ -1,0 +1,8 @@
+# Ядро LocalMind работает на чистой стандартной библиотеке Python —
+# обязательных зависимостей нет.
+
+# Необязательное:
+PyYAML>=6.0          # удобное чтение config.yaml (иначе работает встроенный парсер)
+
+# Для дообучения весов (модуль localmind.train) — ставится отдельно, нужен GPU:
+#   pip install torch transformers peft datasets accelerate bitsandbytes
