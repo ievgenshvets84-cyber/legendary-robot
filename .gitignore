@@ -32,3 +32,16 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# --- LocalMind (Python) ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# Рабочее состояние агента (память, цели, адаптеры) — не коммитим
+state/
+localmind/skills/pending/
