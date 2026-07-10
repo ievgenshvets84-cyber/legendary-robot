@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import base64
 import json
 import tempfile
 import unittest
@@ -12,6 +13,7 @@ from pathlib import Path
 
 from localmind.agent import Agent, _first_json_object, _parse_action
 from localmind.config import Config
+from localmind.media import MediaClient, register_media_tools
 from localmind.memory import Memory, _cosine, _lexical
 from localmind.safety import Guard, SafetyError
 from localmind.skill_manager import SkillManager, _extract_name, _strip_code_fences
@@ -179,6 +181,44 @@ class TestAgentParsing(unittest.TestCase):
             result = agent.run("создай файл r.txt")
             self.assertEqual(result, "файл создан")
             self.assertEqual((Path(d) / "r.txt").read_text(encoding="utf-8"), "данные")
+
+
+class TestMedia(unittest.TestCase):
+    def test_generate_image_saves_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            guard = Guard(Path(d))
+            client = MediaClient(guard, save_dir="state/media")
+            fake_png = base64.b64encode(b"\x89PNG\r\n\x1a\nFAKE").decode()
+            # Подменяем сетевой вызов на канонический ответ txt2img.
+            client._post = lambda url, payload: {"images": [fake_png]}
+            paths = client.generate_image("кот в шляпе", count=1)
+            self.assertEqual(len(paths), 1)
+            self.assertTrue(paths[0].exists())
+            self.assertEqual(paths[0].read_bytes(), base64.b64decode(fake_png))
+
+    def test_save_dir_confined_to_workspace(self):
+        with tempfile.TemporaryDirectory() as d:
+            guard = Guard(Path(d))
+            client = MediaClient(guard, save_dir="../escape")
+            with self.assertRaises(SafetyError):
+                client._save_dir()
+
+    def test_media_tools_registered(self):
+        with tempfile.TemporaryDirectory() as d:
+            reg, guard = make_registry(Path(d))
+            client = MediaClient(guard)
+            register_media_tools(reg, client)
+            self.assertIn("generate_image", reg.names())
+            self.assertIn("generate_video", reg.names())
+
+    def test_video_requires_backend(self):
+        with tempfile.TemporaryDirectory() as d:
+            guard = Guard(Path(d))
+            client = MediaClient(guard, video_host="")
+            reg, _ = make_registry(Path(d))
+            register_media_tools(reg, client)
+            out = reg.call("generate_video", {"prompt": "рассвет над морем"})
+            self.assertIn("видео-бэкенд не настроен", out)
 
 
 class TestConfig(unittest.TestCase):

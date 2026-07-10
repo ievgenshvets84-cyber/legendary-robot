@@ -20,6 +20,7 @@ from .agent import Agent
 from .autonomy import AutonomyLoop
 from .config import Config
 from .llm import LLMClient
+from .media import MediaClient, register_media_tools
 from .memory import Memory
 from .safety import Guard
 from .skill_manager import SkillManager
@@ -39,6 +40,13 @@ class App:
         ctx = ToolContext(guard=self.guard, memory=self.memory, llm=self.llm,
                           sandbox_timeout=int(cfg.safety["sandbox_timeout"]))
         self.registry = ToolRegistry(ctx)
+        self.media = MediaClient(
+            self.guard, save_dir=cfg.media["save_dir"],
+            image_host=cfg.media["image_host"], video_host=cfg.media["video_host"],
+            steps=int(cfg.media["steps"]), width=int(cfg.media["width"]),
+            height=int(cfg.media["height"]), cfg_scale=float(cfg.media["cfg_scale"]),
+            sampler=str(cfg.media["sampler"]), timeout=int(cfg.media["timeout"]))
+        register_media_tools(self.registry, self.media)
         self.skills = SkillManager(cfg.root / cfg.skills["dir"], self.registry,
                                    self.guard, self.llm,
                                    require_approval=bool(cfg.autonomy["require_approval"]))
@@ -77,7 +85,29 @@ def cmd_doctor(app: App, args: argparse.Namespace) -> int:
     pending = app.skills.list_pending()
     if pending:
         print(f"Ждут одобрения навыки: {', '.join(pending)}")
+    img = "доступен" if app.media.image_available() else "не запущен"
+    vid = ("доступен" if app.media.video_available()
+           else ("не настроен" if not app.cfg.media["video_host"] else "не запущен"))
+    print(f"Медиа: изображения ({app.cfg.media['image_host']}) — {img}; видео — {vid}")
     print(f"Память: {app.memory.stats()}")
+    return 0
+
+
+def cmd_media(app: App, args: argparse.Namespace) -> int:
+    prompt = " ".join(args.prompt)
+    try:
+        if args.kind == "image":
+            paths = app.media.generate_image(prompt, negative_prompt=args.negative or "",
+                                             count=args.count)
+        else:
+            paths = app.media.generate_video(prompt, negative_prompt=args.negative or "",
+                                             seconds=args.seconds)
+    except Exception as exc:
+        print(f"Ошибка генерации: {exc}")
+        return 1
+    print("Готово:")
+    for p in paths:
+        print(f"  {p}")
     return 0
 
 
@@ -214,12 +244,20 @@ def build_parser() -> argparse.ArgumentParser:
     pm = sub.add_parser("memory", help="работа с памятью")
     pm.add_argument("action", choices=["stats", "search", "add"])
     pm.add_argument("query", nargs="*")
+
+    pmd = sub.add_parser("media", help="локальная генерация изображений и видео")
+    pmd.add_argument("kind", choices=["image", "video"])
+    pmd.add_argument("prompt", nargs="+", help="описание сцены")
+    pmd.add_argument("--negative", help="что исключить из генерации")
+    pmd.add_argument("--count", type=int, default=1, help="сколько изображений (1–4)")
+    pmd.add_argument("--seconds", type=float, default=2.0, help="длительность видео")
     return p
 
 
 COMMANDS = {
     "doctor": cmd_doctor, "chat": cmd_chat, "run": cmd_run,
     "auto": cmd_auto, "skills": cmd_skills, "memory": cmd_memory,
+    "media": cmd_media,
 }
 
 

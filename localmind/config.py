@@ -47,6 +47,20 @@ DEFAULTS: dict[str, Any] = {
     "skills": {
         "dir": "localmind/skills",
     },
+    "media": {
+        # Локальная генерация медиа на открытых моделях.
+        # image_host — API, совместимый с AUTOMATIC1111 / SD.Next (txt2img).
+        "image_host": "http://localhost:7860",
+        # video_host — локальный сервер видео (обёртка над ComfyUI / SVD и т.п.).
+        "video_host": "",
+        "save_dir": "state/media",
+        "steps": 30,
+        "width": 768,
+        "height": 768,
+        "cfg_scale": 7.0,
+        "sampler": "DPM++ 2M Karras",
+        "timeout": 600,
+    },
 }
 
 
@@ -58,6 +72,7 @@ class Config:
     autonomy: dict[str, Any] = field(default_factory=lambda: dict(DEFAULTS["autonomy"]))
     safety: dict[str, Any] = field(default_factory=lambda: dict(DEFAULTS["safety"]))
     skills: dict[str, Any] = field(default_factory=lambda: dict(DEFAULTS["skills"]))
+    media: dict[str, Any] = field(default_factory=lambda: dict(DEFAULTS["media"]))
     root: Path = field(default_factory=lambda: Path.cwd())
 
     @classmethod
@@ -69,7 +84,7 @@ class Config:
         data: dict[str, Any] = {}
         if candidate.exists():
             data = _read_yaml(candidate)
-        for section in ("llm", "agent", "memory", "autonomy", "safety", "skills"):
+        for section in ("llm", "agent", "memory", "autonomy", "safety", "skills", "media"):
             if section in data and isinstance(data[section], dict):
                 getattr(cfg, section).update(data[section])
         # Переопределения через переменные окружения (удобно для контейнеров).

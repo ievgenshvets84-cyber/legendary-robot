@@ -3,6 +3,7 @@
 
 # Необязательное:
 PyYAML>=6.0          # удобное чтение config.yaml (иначе работает встроенный парсер)
+Pillow>=10.0         # сборка кадров видео в GIF (media.py); без него кадры сохраняются как PNG
 
 # Для дообучения весов (модуль localmind.train) — ставится отдельно, нужен GPU:
 #   pip install torch transformers peft datasets accelerate bitsandbytes

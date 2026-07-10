@@ -30,3 +30,14 @@ safety:
 
 skills:
   dir: localmind/skills
+
+media:
+  image_host: http://localhost:7860   # локальный API AUTOMATIC1111 / SD.Next (txt2img)
+  video_host: ""                       # локальный видео-бэкенд (обёртка ComfyUI/SVD)
+  save_dir: state/media
+  steps: 30
+  width: 768
+  height: 768
+  cfg_scale: 7.0
+  sampler: DPM++ 2M Karras
+  timeout: 600
