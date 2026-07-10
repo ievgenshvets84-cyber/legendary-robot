@@ -149,7 +149,58 @@ class MediaClient:
             "fps": fps,
         }
         data = self._post(self.video_host + "/generate", payload)
-        # Поддерживаем два формата ответа: готовый ролик или набор кадров.
+        return self._handle_video_response(data, fps)
+
+    # ── image-to-video (анимация одной картинки, Stable Video Diffusion) ──
+    def image_to_video(self, init_image: str, prompt: str = "",
+                       negative_prompt: str = "", seconds: float = 2.0,
+                       fps: int = 8, motion: int = 127) -> list[Path]:
+        """Оживить одно изображение в короткий ролик через локальный SVD-бэкенд.
+
+        motion — «сила движения» (motion_bucket_id в SVD): больше = динамичнее.
+        """
+        if not self.video_host:
+            raise MediaError(
+                "Локальный видео-бэкенд не настроен (media.video_host пуст). "
+                "Поднимите локальный сервер (обёртку над ComfyUI со Stable Video "
+                "Diffusion) с эндпоинтом /img2video и укажите его адрес."
+            )
+        payload = {
+            "init_image": self._read_image_b64(init_image),
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "num_frames": max(1, int(seconds * fps)),
+            "fps": fps,
+            "motion_bucket_id": motion,
+        }
+        data = self._post(self.video_host + "/img2video", payload)
+        return self._handle_video_response(data, fps)
+
+    # ── сборка клипа из нескольких готовых картинок ───────────────────────
+    def images_to_video(self, images: list[str], fps: int = 8) -> list[Path]:
+        """Собрать ролик из последовательности сгенерированных изображений.
+
+        Работает локально без видео-бэкенда: кадры склеиваются в анимированный
+        GIF (нужен Pillow). Порядок кадров — как передан в списке.
+        """
+        if not images:
+            raise MediaError("Не переданы изображения для сборки видео.")
+        frames: list[Path] = []
+        for path in images:
+            target = self.guard.resolve_path(path)
+            if not target.exists():
+                raise MediaError(f"Кадр не найден: {path}")
+            frames.append(target)
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        out = self._save_dir() / f"clip-{stamp}.gif"
+        gif = self._assemble_gif(frames, fps=fps, out_path=out)
+        if not gif:
+            raise MediaError("Для сборки видео из картинок нужен Pillow: "
+                             "pip install Pillow")
+        return [gif]
+
+    def _handle_video_response(self, data: dict[str, Any], fps: int) -> list[Path]:
+        """Разбирает ответ видео-сервера: готовый ролик или набор кадров."""
         if data.get("video"):
             return self._save_many([data["video"]], prefix="vid", ext="mp4")
         frames = data.get("frames") or []
@@ -191,7 +242,8 @@ class MediaClient:
             paths.append(path)
         return paths
 
-    def _assemble_gif(self, frames: list[Path], fps: int) -> Path | None:
+    def _assemble_gif(self, frames: list[Path], fps: int,
+                      out_path: Path | None = None) -> Path | None:
         """Собирает кадры в анимированный GIF, если доступен Pillow."""
         try:
             from PIL import Image  # type: ignore
@@ -199,8 +251,9 @@ class MediaClient:
             return None
         if not frames:
             return None
-        imgs = [Image.open(p) for p in frames]
-        gif_path = frames[0].with_name(frames[0].stem.replace("frame", "clip") + ".gif")
+        imgs = [Image.open(p).convert("RGB") for p in frames]
+        gif_path = out_path or frames[0].with_name(
+            frames[0].stem.replace("frame", "clip") + ".gif")
         imgs[0].save(gif_path, save_all=True, append_images=imgs[1:],
                      duration=int(1000 / max(1, fps)), loop=0)
         return gif_path
@@ -297,6 +350,23 @@ def register_media_tools(registry: ToolRegistry, media: MediaClient) -> None:
          "strength": "сила изменений 0.0–1.0 (необязательно)"},
         _inpaint,
     ))
+    def _img2video(ctx, init_image: str, prompt: str = "", seconds: str = "2") -> str:
+        try:
+            secs = float(seconds)
+        except (TypeError, ValueError):
+            secs = 2.0
+        paths = media.image_to_video(init_image=init_image, prompt=prompt, seconds=secs)
+        return "Оживлённое изображение (видео/кадры):\n" + "\n".join(str(p) for p in paths)
+
+    def _images2video(ctx, images: str, fps: str = "8") -> str:
+        items = [s.strip() for s in images.split(",") if s.strip()]
+        try:
+            rate = max(1, int(fps))
+        except (TypeError, ValueError):
+            rate = 8
+        paths = media.images_to_video(items, fps=rate)
+        return "Клип из картинок:\n" + "\n".join(str(p) for p in paths)
+
     registry.register(Tool(
         "generate_video",
         "Сгенерировать короткое видео локальным видео-бэкендом и сохранить "
@@ -305,4 +375,20 @@ def register_media_tools(registry: ToolRegistry, media: MediaClient) -> None:
          "negative_prompt": "чего избегать (необязательно)",
          "seconds": "длительность в секундах (необязательно)"},
         _gen_video,
+    ))
+    registry.register(Tool(
+        "image_to_video",
+        "Оживить одно сгенерированное изображение в короткий ролик "
+        "(image-to-video через локальный Stable Video Diffusion).",
+        {"init_image": "путь к исходному изображению в рабочей папке",
+         "prompt": "подсказка по движению (необязательно)",
+         "seconds": "длительность в секундах (необязательно)"},
+        _img2video,
+    ))
+    registry.register(Tool(
+        "images_to_video",
+        "Собрать короткий клип из последовательности сгенерированных картинок.",
+        {"images": "пути к изображениям через запятую, в нужном порядке",
+         "fps": "кадров в секунду (необязательно)"},
+        _images2video,
     ))

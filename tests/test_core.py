@@ -267,6 +267,69 @@ class TestMedia(unittest.TestCase):
             out = reg.call("generate_video", {"prompt": "рассвет над морем"})
             self.assertIn("видео-бэкенд не настроен", out)
 
+    def test_image_to_video_sends_init(self):
+        with tempfile.TemporaryDirectory() as d:
+            guard = Guard(Path(d))
+            (Path(d) / "still.png").write_bytes(b"\x89PNG\r\n\x1a\nSTILL")
+            client = MediaClient(guard, save_dir="state/media",
+                                 video_host="http://localhost:9000")
+            captured = {}
+
+            def fake_post(url, payload):
+                captured["url"] = url
+                captured["payload"] = payload
+                return {"video": base64.b64encode(b"MP4DATA").decode()}
+
+            client._post = fake_post
+            paths = client.image_to_video("still.png", prompt="лёгкий ветер", seconds=1)
+            self.assertTrue(captured["url"].endswith("/img2video"))
+            self.assertIn("init_image", captured["payload"])
+            self.assertTrue(paths[0].exists())
+            self.assertTrue(str(paths[0]).endswith(".mp4"))
+
+    def test_image_to_video_requires_backend(self):
+        with tempfile.TemporaryDirectory() as d:
+            guard = Guard(Path(d))
+            (Path(d) / "still.png").write_bytes(b"data")
+            reg, _ = make_registry(Path(d))
+            register_media_tools(reg, MediaClient(guard, video_host=""))
+            out = reg.call("image_to_video", {"init_image": "still.png"})
+            self.assertIn("видео-бэкенд не настроен", out)
+
+    def test_images_to_video_missing_frame(self):
+        with tempfile.TemporaryDirectory() as d:
+            client = MediaClient(Guard(Path(d)))
+            with self.assertRaises(Exception) as ctx:
+                client.images_to_video(["нет1.png", "нет2.png"])
+            self.assertIn("Кадр не найден", str(ctx.exception))
+
+    def test_images_to_video_assembles_or_needs_pillow(self):
+        with tempfile.TemporaryDirectory() as d:
+            guard = Guard(Path(d))
+            # Валидный 1x1 PNG, чтобы тест работал и при наличии Pillow.
+            png = base64.b64decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk"
+                "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+            frames = []
+            for i in range(3):
+                p = Path(d) / f"f{i}.png"
+                p.write_bytes(png)
+                frames.append(f"f{i}.png")
+            client = MediaClient(guard, save_dir="state/media")
+            try:
+                import PIL  # noqa: F401
+                has_pillow = True
+            except ImportError:
+                has_pillow = False
+            if has_pillow:
+                paths = client.images_to_video(frames, fps=6)
+                self.assertTrue(paths[0].exists())
+                self.assertTrue(str(paths[0]).endswith(".gif"))
+            else:
+                with self.assertRaises(Exception) as ctx:
+                    client.images_to_video(frames, fps=6)
+                self.assertIn("Pillow", str(ctx.exception))
+
 
 class TestConfig(unittest.TestCase):
     def test_defaults(self):

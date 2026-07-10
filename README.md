@@ -119,12 +119,25 @@ python -m localmind media img2img "сделай зимнюю ночь" --init st
 # (белое в маске — перерисовать, чёрное — оставить)
 python -m localmind media inpaint "надеть красную шляпу" \
     --init state/media/img.png --mask state/media/mask.png --strength 0.75
+
+# image-to-video: оживить одну сгенерированную картинку в ролик
+# (Stable Video Diffusion через локальный видео-бэкенд)
+python -m localmind media img2video "лёгкий ветер, качаются деревья" \
+    --init state/media/img.png --seconds 2
+
+# slideshow: собрать клип из нескольких сгенерированных картинок
+# (локально, через Pillow — видео-бэкенд не нужен)
+python -m localmind media slideshow --images state/media/a.png,state/media/b.png,state/media/c.png --fps 6
 ```
 
-Агент может вызывать генерацию сам — инструменты `generate_image`,
-`generate_video`, `image_to_image` и `inpaint_image` доступны в `run`/`auto`.
-Файлы сохраняются в `state/media/` (внутри песочницы). Настройка адресов
-серверов — в секции `media` файла `config.yaml`.
+Типичный конвейер: сгенерировать кадр (`image`) → оживить его (`img2video`),
+либо собрать несколько кадров в клип (`slideshow`).
+
+Агент может вызывать всё это сам — инструменты `generate_image`,
+`generate_video`, `image_to_image`, `inpaint_image`, `image_to_video` и
+`images_to_video` доступны в `run`/`auto`. Файлы сохраняются в `state/media/`
+(внутри песочницы). Настройка адресов серверов — в секции `media` файла
+`config.yaml`.
 
 > Генерация идёт офлайн на ваших моделях — внешнего сервиса-«цензора» в этой
 > цепочке нет. При этом LocalMind **не отключает и не обходит** защитные
@@ -160,7 +173,7 @@ python -m localmind media inpaint "надеть красную шляпу" \
 | `safety.py` | песочница путей и фильтр разрушительного кода |
 | `skill_manager.py` | самопрограммирование: агент пишет, проверяет и регистрирует навыки |
 | `agent.py` | цикл рассуждение→действие на JSON-протоколе (работает с любой моделью) |
-| `media.py` | локальная генерация изображений и видео: txt2img, img2img, inpainting |
+| `media.py` | локальная генерация медиа: txt2img, img2img, inpainting, image-to-video, слайдшоу |
 | `autonomy.py` | автономная работа по списку целей |
 | `train.py` | опциональное дообучение весов через LoRA (нужен GPU) |
 | `cli.py` | командный интерфейс |

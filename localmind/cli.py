@@ -96,6 +96,9 @@ def cmd_doctor(app: App, args: argparse.Namespace) -> int:
 def cmd_media(app: App, args: argparse.Namespace) -> int:
     prompt = " ".join(args.prompt)
     neg = args.negative or ""
+    if args.kind in ("image", "video", "img2img", "inpaint") and not prompt:
+        print(f"Для режима '{args.kind}' нужен текстовый запрос.")
+        return 1
     try:
         if args.kind == "image":
             paths = app.media.generate_image(prompt, negative_prompt=neg, count=args.count)
@@ -114,6 +117,18 @@ def cmd_media(app: App, args: argparse.Namespace) -> int:
                 return 1
             paths = app.media.inpaint(prompt, init_image=args.init, mask_image=args.mask,
                                       negative_prompt=neg, denoising_strength=args.strength)
+        elif args.kind == "img2video":
+            if not args.init:
+                print("Для img2video укажите --init <путь к изображению>.")
+                return 1
+            paths = app.media.image_to_video(init_image=args.init, prompt=prompt,
+                                             seconds=args.seconds, fps=args.fps)
+        elif args.kind == "slideshow":
+            if not args.images:
+                print("Для slideshow укажите --images путь1,путь2,...")
+                return 1
+            frames = [s.strip() for s in args.images.split(",") if s.strip()]
+            paths = app.media.images_to_video(frames, fps=args.fps)
         else:
             print(f"Неизвестный режим: {args.kind}")
             return 1
@@ -261,15 +276,18 @@ def build_parser() -> argparse.ArgumentParser:
     pm.add_argument("query", nargs="*")
 
     pmd = sub.add_parser("media", help="локальная генерация изображений и видео")
-    pmd.add_argument("kind", choices=["image", "video", "img2img", "inpaint"])
-    pmd.add_argument("prompt", nargs="+", help="описание сцены")
+    pmd.add_argument("kind", choices=["image", "video", "img2img", "inpaint",
+                                      "img2video", "slideshow"])
+    pmd.add_argument("prompt", nargs="*", help="описание сцены (для slideshow не нужно)")
     pmd.add_argument("--negative", help="что исключить из генерации")
     pmd.add_argument("--count", type=int, default=1, help="сколько изображений (1–4)")
     pmd.add_argument("--seconds", type=float, default=2.0, help="длительность видео")
-    pmd.add_argument("--init", help="исходное изображение (img2img/inpaint)")
+    pmd.add_argument("--init", help="исходное изображение (img2img/inpaint/img2video)")
     pmd.add_argument("--mask", help="чёрно-белая маска (inpaint)")
     pmd.add_argument("--strength", type=float, default=0.6,
                      help="сила изменений 0.0–1.0 (img2img/inpaint)")
+    pmd.add_argument("--images", help="кадры для slideshow: пути через запятую")
+    pmd.add_argument("--fps", type=int, default=8, help="кадров в секунду (видео/slideshow)")
     return p
 
 
