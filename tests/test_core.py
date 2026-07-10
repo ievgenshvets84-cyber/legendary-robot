@@ -464,6 +464,45 @@ class TestWeb(unittest.TestCase):
         from localmind import web
         self.assertIn("LocalMind", web.INDEX_HTML)
         self.assertIn("/api/chat", web.INDEX_HTML)
+        self.assertIn("/api/media", web.INDEX_HTML)
+
+    def test_handle_media_image(self):
+        with tempfile.TemporaryDirectory() as d:
+            from localmind import web
+            ws = Path(d)
+            media_dir = ws / "state" / "media"
+            media_dir.mkdir(parents=True)
+            out = media_dir / "img-0.png"
+            out.write_bytes(b"PNG")
+
+            class FakeGuard:
+                workspace = ws
+
+            class FakeMedia:
+                guard = FakeGuard()
+                save_dir = "state/media"
+
+                def generate_image(self, prompt, count=1):
+                    return [out]
+
+            class StubApp:
+                pass
+
+            app = StubApp()
+            app.media = FakeMedia()
+            res = web.handle_media(app, {"kind": "image", "prompt": "кот"})
+            self.assertEqual(len(res["files"]), 1)
+            self.assertEqual(res["files"][0]["url"], "/media/img-0.png")
+            self.assertEqual(res["files"][0]["path"], "state/media/img-0.png")
+
+    def test_handle_media_needs_prompt(self):
+        from localmind import web
+
+        class StubApp:
+            media = None
+
+        out = web.handle_media(StubApp(), {"kind": "image", "prompt": ""})
+        self.assertIn("error", out)
 
 
 class TestConfig(unittest.TestCase):

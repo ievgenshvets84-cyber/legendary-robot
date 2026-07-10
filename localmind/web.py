@@ -65,6 +65,52 @@ def handle_agent(app: Any, data: dict[str, Any]) -> dict[str, Any]:
     return {"result": result, "events": events}
 
 
+def handle_media(app: Any, data: dict[str, Any]) -> dict[str, Any]:
+    kind = str(data.get("kind", "image"))
+    prompt = str(data.get("prompt", "")).strip()
+    file = str(data.get("file", "")).strip()
+    try:
+        if kind == "image":
+            if not prompt:
+                return {"error": "Нужен текстовый запрос для изображения."}
+            paths = app.media.generate_image(prompt, count=int(data.get("count", 1) or 1))
+        elif kind == "img2img":
+            if not file or not prompt:
+                return {"error": "Нужны исходная картинка и запрос."}
+            paths = app.media.image_to_image(prompt, init_image=file)
+        elif kind == "upscale":
+            if not file:
+                return {"error": "Нет изображения для апскейла."}
+            paths = app.media.upscale_image(file, scale=float(data.get("scale", 2) or 2))
+        elif kind == "img2video":
+            if not file:
+                return {"error": "Нет изображения для анимации."}
+            paths = app.media.image_to_video(init_image=file, prompt=prompt)
+        else:
+            return {"error": f"Неизвестный режим медиа: {kind}"}
+    except Exception as exc:
+        return {"error": str(exc)}
+    return {"files": _media_files(app, paths)}
+
+
+def _media_files(app: Any, paths: list) -> list[dict[str, str]]:
+    workspace = app.media.guard.workspace
+    out: list[dict[str, str]] = []
+    for p in paths:
+        try:
+            rel = str(p.relative_to(workspace))
+        except ValueError:
+            rel = str(p)
+        out.append({"name": p.name, "url": "/media/" + p.name, "path": rel})
+    return out
+
+
+_CTYPES = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".gif": "image/gif", ".webp": "image/webp", ".mp4": "video/mp4",
+}
+
+
 def new_state() -> dict[str, Any]:
     return {"history": [{
         "role": "system",
@@ -109,8 +155,25 @@ def make_handler(app: Any) -> type[BaseHTTPRequestHandler]:
                 self._send(200, INDEX_HTML.encode("utf-8"), "text/html; charset=utf-8")
             elif path == "/api/status":
                 self._json(status_payload(app))
+            elif path.startswith("/media/"):
+                self._serve_media(path[len("/media/"):])
             else:
                 self._json({"error": "not found"}, 404)
+
+        def _serve_media(self, name: str) -> None:
+            if not name or "/" in name or "\\" in name or ".." in name:
+                self._json({"error": "bad name"}, 400)
+                return
+            try:
+                target = app.media.guard.resolve_path(app.media.save_dir + "/" + name)
+            except Exception:
+                self._json({"error": "forbidden"}, 403)
+                return
+            if not target.exists() or not target.is_file():
+                self._json({"error": "not found"}, 404)
+                return
+            ctype = _CTYPES.get(target.suffix.lower(), "application/octet-stream")
+            self._send(200, target.read_bytes(), ctype)
 
         def do_POST(self) -> None:
             path = self.path.split("?", 1)[0]
@@ -119,6 +182,8 @@ def make_handler(app: Any) -> type[BaseHTTPRequestHandler]:
                 self._json(handle_chat(app, state, data))
             elif path == "/api/agent":
                 self._json(handle_agent(app, data))
+            elif path == "/api/media":
+                self._json(handle_media(app, data))
             elif path == "/api/reset":
                 state.clear()
                 state.update(new_state())
@@ -220,6 +285,15 @@ INDEX_HTML = r"""<!doctype html>
   .reset { border:1px solid var(--border); background:transparent; color:var(--muted);
            border-radius:11px; height:44px; padding:0 12px; cursor:pointer; font-size:13px; }
   .hint { max-width:820px; margin:6px auto 0; font-size:12px; color:var(--muted); }
+  .bubble.media { background:var(--panel); border:1px solid var(--border); max-width:88%;
+                  display:flex; flex-direction:column; gap:12px; }
+  .mediaItem { display:flex; flex-direction:column; gap:6px; }
+  .thumb { max-width:100%; border-radius:9px; border:1px solid var(--border); }
+  .acts { display:flex; gap:6px; flex-wrap:wrap; }
+  .acts button { border:1px solid var(--border); background:var(--bg); color:var(--text);
+                 border-radius:8px; padding:4px 10px; font-size:12.5px; cursor:pointer; }
+  .acts button:hover { border-color:var(--accent); color:var(--accent); }
+  .caption { font-size:11.5px; color:var(--muted); word-break:break-all; }
 </style>
 </head>
 <body>
@@ -228,6 +302,7 @@ INDEX_HTML = r"""<!doctype html>
   <div class="modes">
     <button id="mChat" class="active" onclick="setMode('chat')">Чат</button>
     <button id="mAgent" onclick="setMode('agent')">Агент</button>
+    <button id="mMedia" onclick="setMode('media')">Медиа</button>
   </div>
   <span id="status"><span class="dot bad"></span>проверка…</span>
 </header>
@@ -251,7 +326,13 @@ function setMode(m){
   mode = m;
   document.getElementById("mChat").classList.toggle("active", m==="chat");
   document.getElementById("mAgent").classList.toggle("active", m==="agent");
-  input.placeholder = m==="chat" ? "Спросите что-нибудь…" : "Опишите задачу для агента…";
+  document.getElementById("mMedia").classList.toggle("active", m==="media");
+  input.placeholder = m==="chat" ? "Спросите что-нибудь…"
+    : m==="agent" ? "Опишите задачу для агента…"
+    : "Опишите картинку для генерации…";
+  document.getElementById("hint").textContent = m==="media"
+    ? "Режим «Медиа»: опишите картинку и нажмите Отправить. У готовых картинок есть кнопки Апскейл и Оживить."
+    : "Режим «Чат» — обычный диалог. Режим «Агент» — задача с инструментами и памятью.";
 }
 input.addEventListener("input", ()=>{ input.style.height="auto"; input.style.height=Math.min(input.scrollHeight,160)+"px"; });
 input.addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); }});
@@ -276,6 +357,43 @@ function addTrace(events){
 }
 function scroll(){ messages.parentElement.scrollTop = messages.parentElement.scrollHeight; }
 
+function post(url, body){
+  return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json());
+}
+function mkBtn(label, fn){ const b=document.createElement("button"); b.textContent=label; b.onclick=fn; return b; }
+
+function addMedia(files){
+  const row=document.createElement("div"); row.className="msg bot";
+  const box=document.createElement("div"); box.className="bubble media";
+  for(const f of files){
+    const item=document.createElement("div"); item.className="mediaItem";
+    let el;
+    if(/\.(mp4)$/i.test(f.name)){ el=document.createElement("video"); el.src=f.url; el.controls=true; }
+    else { el=document.createElement("img"); el.src=f.url; el.loading="lazy"; }
+    el.className="thumb"; item.appendChild(el);
+    const acts=document.createElement("div"); acts.className="acts";
+    const a=document.createElement("a"); a.href=f.url; a.download=f.name; a.appendChild(mkBtn("Скачать", ()=>{}));
+    acts.appendChild(a);
+    if(!/\.(mp4)$/i.test(f.name)){
+      acts.appendChild(mkBtn("Апскейл ×2", ()=>mediaAction("upscale", f.path)));
+      acts.appendChild(mkBtn("Оживить", ()=>mediaAction("img2video", f.path)));
+    }
+    item.appendChild(acts);
+    const cap=document.createElement("div"); cap.className="caption"; cap.textContent=f.path; item.appendChild(cap);
+    box.appendChild(item);
+  }
+  row.appendChild(box); messages.appendChild(row); scroll();
+}
+
+async function mediaAction(kind, file){
+  const pending = addMsg("… "+(kind==="upscale"?"апскейл":"анимация"), "bot");
+  try {
+    const j = await post("/api/media",{kind:kind, file:file, prompt:input.value.trim()});
+    pending.remove();
+    if(j.error){ addMsg("⚠ "+j.error, "bot"); } else { addMedia(j.files); }
+  } catch(err){ pending.textContent="⚠ Ошибка сети: "+err; }
+}
+
 async function send(){
   const text = input.value.trim(); if(!text) return;
   addMsg(text, "user"); input.value=""; input.style.height="auto";
@@ -283,14 +401,16 @@ async function send(){
   const pending = addMsg("…", "bot");
   try {
     if(mode==="chat"){
-      const r = await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
-      const j = await r.json();
+      const j = await post("/api/chat",{message:text});
       pending.textContent = j.error ? ("⚠ "+j.error) : j.reply;
-    } else {
-      const r = await fetch("/api/agent",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task:text})});
-      const j = await r.json();
+    } else if(mode==="agent"){
+      const j = await post("/api/agent",{task:text});
       pending.textContent = j.error ? ("⚠ "+j.error) : j.result;
       addTrace(j.events);
+    } else {
+      const j = await post("/api/media",{kind:"image", prompt:text});
+      pending.remove();
+      if(j.error){ addMsg("⚠ "+j.error, "bot"); } else { addMedia(j.files); }
     }
   } catch(err){
     pending.textContent = "⚠ Ошибка сети: "+err;
