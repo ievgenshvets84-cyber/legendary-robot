@@ -128,14 +128,21 @@ python -m localmind media img2video "лёгкий ветер, качаются �
 # slideshow: собрать клип из нескольких сгенерированных картинок
 # (локально, через Pillow — видео-бэкенд не нужен)
 python -m localmind media slideshow --images state/media/a.png,state/media/b.png,state/media/c.png --fps 6
+
+# upscale: увеличить разрешение картинки (ESRGAN/R-ESRGAN на SD-сервере)
+python -m localmind media upscale --init state/media/img.png --scale 4
+
+# upscale видео: покадрово увеличить GIF-клип и пересобрать его
+python -m localmind media upscale_video --init state/media/clip.gif --scale 2
 ```
 
 Типичный конвейер: сгенерировать кадр (`image`) → оживить его (`img2video`),
 либо собрать несколько кадров в клип (`slideshow`).
 
 Агент может вызывать всё это сам — инструменты `generate_image`,
-`generate_video`, `image_to_image`, `inpaint_image`, `image_to_video` и
-`images_to_video` доступны в `run`/`auto`. Файлы сохраняются в `state/media/`
+`generate_video`, `image_to_image`, `inpaint_image`, `image_to_video`,
+`images_to_video`, `upscale_image` и `upscale_video` доступны в `run`/`auto`.
+Файлы сохраняются в `state/media/`
 (внутри песочницы). Настройка адресов серверов — в секции `media` файла
 `config.yaml`.
 
@@ -173,7 +180,7 @@ python -m localmind media slideshow --images state/media/a.png,state/media/b.png
 | `safety.py` | песочница путей и фильтр разрушительного кода |
 | `skill_manager.py` | самопрограммирование: агент пишет, проверяет и регистрирует навыки |
 | `agent.py` | цикл рассуждение→действие на JSON-протоколе (работает с любой моделью) |
-| `media.py` | локальная генерация медиа: txt2img, img2img, inpainting, image-to-video, слайдшоу |
+| `media.py` | локальная генерация медиа: txt2img, img2img, inpainting, image-to-video, слайдшоу, апскейл картинок и видео |
 | `autonomy.py` | автономная работа по списку целей |
 | `train.py` | опциональное дообучение весов через LoRA (нужен GPU) |
 | `cli.py` | командный интерфейс |

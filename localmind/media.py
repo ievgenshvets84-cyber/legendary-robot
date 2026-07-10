@@ -14,6 +14,7 @@ Diffusion и т.п.), либо покадрово из изображений.
 from __future__ import annotations
 
 import base64
+import io
 import json
 import time
 import urllib.error
@@ -34,7 +35,8 @@ class MediaClient:
                  image_host: str = "http://localhost:7860",
                  video_host: str = "", steps: int = 30,
                  width: int = 768, height: int = 768, cfg_scale: float = 7.0,
-                 sampler: str = "DPM++ 2M Karras", timeout: int = 600) -> None:
+                 sampler: str = "DPM++ 2M Karras", upscaler: str = "R-ESRGAN 4x+",
+                 upscale: float = 2.0, timeout: int = 600) -> None:
         self.guard = guard
         self.save_dir = save_dir
         self.image_host = image_host.rstrip("/")
@@ -44,6 +46,8 @@ class MediaClient:
         self.height = height
         self.cfg_scale = cfg_scale
         self.sampler = sampler
+        self.upscaler = upscaler
+        self.upscale = upscale
         self.timeout = timeout
 
     # ── изображения ──────────────────────────────────────────────────────
@@ -198,6 +202,67 @@ class MediaClient:
             raise MediaError("Для сборки видео из картинок нужен Pillow: "
                              "pip install Pillow")
         return [gif]
+
+    # ── апскейл изображений и видео ──────────────────────────────────────
+    def upscale_image(self, image: str, scale: float | None = None,
+                      upscaler: str | None = None) -> list[Path]:
+        """Увеличить разрешение изображения апскейлером SD-сервера (ESRGAN и т.п.)."""
+        if not self.image_host:
+            raise MediaError("Не задан media.image_host в config.yaml.")
+        b64 = self._upscale_b64(self._read_image_b64(image),
+                                scale or self.upscale, upscaler or self.upscaler)
+        return self._save_many([b64], prefix="up", ext="png")
+
+    def upscale_video(self, video: str, scale: float | None = None,
+                      upscaler: str | None = None, fps: int = 8) -> list[Path]:
+        """Покадрово увеличить разрешение GIF-клипа и пересобрать его.
+
+        Каждый кадр апскейлится тем же сервером, что и картинки. Для mp4 нужен
+        ffmpeg — такой ролик сначала разложите на кадры/GIF.
+        """
+        if not self.image_host:
+            raise MediaError("Для апскейла кадров нужен media.image_host.")
+        target = self.guard.resolve_path(video)
+        if not target.exists():
+            raise MediaError(f"Файл видео не найден: {video}")
+        if target.suffix.lower() != ".gif":
+            raise MediaError(
+                "Апскейл видео поддержан для GIF-клипов (slideshow/img2video без "
+                "бэкенда). Для mp4 нужен ffmpeg — разложите ролик на кадры."
+            )
+        try:
+            from PIL import Image  # type: ignore
+        except ImportError:
+            raise MediaError("Для апскейла видео нужен Pillow: pip install Pillow")
+
+        factor = scale or self.upscale
+        up = upscaler or self.upscaler
+        clip = Image.open(target)
+        upscaled_b64: list[str] = []
+        for i in range(getattr(clip, "n_frames", 1)):
+            clip.seek(i)
+            buf = io.BytesIO()
+            clip.convert("RGB").save(buf, format="PNG")
+            frame_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            upscaled_b64.append(self._upscale_b64(frame_b64, factor, up))
+        saved = self._save_many(upscaled_b64, prefix="upframe", ext="png")
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        out = self._save_dir() / f"clip-up-{stamp}.gif"
+        gif = self._assemble_gif(saved, fps=fps, out_path=out)
+        return [gif] if gif else saved
+
+    def _upscale_b64(self, image_b64: str, scale: float, upscaler: str) -> str:
+        payload = {
+            "resize_mode": 0,               # 0 = увеличить в N раз
+            "upscaling_resize": scale,
+            "upscaler_1": upscaler,
+            "image": image_b64,
+        }
+        data = self._post(self.image_host + "/sdapi/v1/extra-single-image", payload)
+        out = data.get("image")
+        if not out:
+            raise MediaError("Апскейлер не вернул изображение.")
+        return out
 
     def _handle_video_response(self, data: dict[str, Any], fps: int) -> list[Path]:
         """Разбирает ответ видео-сервера: готовый ролик или набор кадров."""
@@ -375,6 +440,36 @@ def register_media_tools(registry: ToolRegistry, media: MediaClient) -> None:
          "negative_prompt": "чего избегать (необязательно)",
          "seconds": "длительность в секундах (необязательно)"},
         _gen_video,
+    ))
+    def _upscale_image(ctx, image: str, scale: str = "2") -> str:
+        try:
+            factor = float(scale)
+        except (TypeError, ValueError):
+            factor = 2.0
+        paths = media.upscale_image(image, scale=factor)
+        return "Увеличенное изображение:\n" + "\n".join(str(p) for p in paths)
+
+    def _upscale_video(ctx, video: str, scale: str = "2") -> str:
+        try:
+            factor = float(scale)
+        except (TypeError, ValueError):
+            factor = 2.0
+        paths = media.upscale_video(video, scale=factor)
+        return "Увеличенный клип:\n" + "\n".join(str(p) for p in paths)
+
+    registry.register(Tool(
+        "upscale_image",
+        "Увеличить разрешение изображения (ESRGAN/R-ESRGAN на локальном SD-сервере).",
+        {"image": "путь к изображению в рабочей папке",
+         "scale": "кратность увеличения, напр. 2 или 4 (необязательно)"},
+        _upscale_image,
+    ))
+    registry.register(Tool(
+        "upscale_video",
+        "Покадрово увеличить разрешение GIF-клипа и пересобрать его.",
+        {"video": "путь к GIF-клипу в рабочей папке",
+         "scale": "кратность увеличения (необязательно)"},
+        _upscale_video,
     ))
     registry.register(Tool(
         "image_to_video",

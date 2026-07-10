@@ -45,7 +45,8 @@ class App:
             image_host=cfg.media["image_host"], video_host=cfg.media["video_host"],
             steps=int(cfg.media["steps"]), width=int(cfg.media["width"]),
             height=int(cfg.media["height"]), cfg_scale=float(cfg.media["cfg_scale"]),
-            sampler=str(cfg.media["sampler"]), timeout=int(cfg.media["timeout"]))
+            sampler=str(cfg.media["sampler"]), upscaler=str(cfg.media["upscaler"]),
+            upscale=float(cfg.media["upscale"]), timeout=int(cfg.media["timeout"]))
         register_media_tools(self.registry, self.media)
         self.skills = SkillManager(cfg.root / cfg.skills["dir"], self.registry,
                                    self.guard, self.llm,
@@ -129,6 +130,16 @@ def cmd_media(app: App, args: argparse.Namespace) -> int:
                 return 1
             frames = [s.strip() for s in args.images.split(",") if s.strip()]
             paths = app.media.images_to_video(frames, fps=args.fps)
+        elif args.kind == "upscale":
+            if not args.init:
+                print("Для upscale укажите --init <путь к изображению>.")
+                return 1
+            paths = app.media.upscale_image(args.init, scale=args.scale)
+        elif args.kind == "upscale_video":
+            if not args.init:
+                print("Для upscale_video укажите --init <путь к GIF-клипу>.")
+                return 1
+            paths = app.media.upscale_video(args.init, scale=args.scale, fps=args.fps)
         else:
             print(f"Неизвестный режим: {args.kind}")
             return 1
@@ -277,7 +288,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     pmd = sub.add_parser("media", help="локальная генерация изображений и видео")
     pmd.add_argument("kind", choices=["image", "video", "img2img", "inpaint",
-                                      "img2video", "slideshow"])
+                                      "img2video", "slideshow", "upscale",
+                                      "upscale_video"])
     pmd.add_argument("prompt", nargs="*", help="описание сцены (для slideshow не нужно)")
     pmd.add_argument("--negative", help="что исключить из генерации")
     pmd.add_argument("--count", type=int, default=1, help="сколько изображений (1–4)")
@@ -288,6 +300,7 @@ def build_parser() -> argparse.ArgumentParser:
                      help="сила изменений 0.0–1.0 (img2img/inpaint)")
     pmd.add_argument("--images", help="кадры для slideshow: пути через запятую")
     pmd.add_argument("--fps", type=int, default=8, help="кадров в секунду (видео/slideshow)")
+    pmd.add_argument("--scale", type=float, default=2.0, help="кратность апскейла")
     return p
 
 

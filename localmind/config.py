@@ -59,6 +59,8 @@ DEFAULTS: dict[str, Any] = {
         "height": 768,
         "cfg_scale": 7.0,
         "sampler": "DPM++ 2M Karras",
+        "upscaler": "R-ESRGAN 4x+",   # апскейлер SD-сервера (ESRGAN/R-ESRGAN…)
+        "upscale": 2.0,               # кратность увеличения по умолчанию
         "timeout": 600,
     },
 }

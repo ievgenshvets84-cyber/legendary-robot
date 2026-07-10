@@ -331,6 +331,70 @@ class TestMedia(unittest.TestCase):
                 self.assertIn("Pillow", str(ctx.exception))
 
 
+    def test_upscale_image_sends_to_extras(self):
+        with tempfile.TemporaryDirectory() as d:
+            guard = Guard(Path(d))
+            (Path(d) / "small.png").write_bytes(b"\x89PNG\r\n\x1a\nSMALL")
+            client = MediaClient(guard, save_dir="state/media")
+            captured = {}
+
+            def fake_post(url, payload):
+                captured["url"] = url
+                captured["payload"] = payload
+                return {"image": base64.b64encode(b"BIGIMG").decode()}
+
+            client._post = fake_post
+            paths = client.upscale_image("small.png", scale=4)
+            self.assertTrue(captured["url"].endswith("/sdapi/v1/extra-single-image"))
+            self.assertEqual(captured["payload"]["upscaling_resize"], 4)
+            self.assertIn("image", captured["payload"])
+            self.assertTrue(paths[0].exists())
+
+    def test_upscale_video_rejects_mp4(self):
+        with tempfile.TemporaryDirectory() as d:
+            guard = Guard(Path(d))
+            (Path(d) / "clip.mp4").write_bytes(b"MP4")
+            client = MediaClient(guard)
+            with self.assertRaises(Exception) as ctx:
+                client.upscale_video("clip.mp4")
+            self.assertIn("ffmpeg", str(ctx.exception))
+
+    def test_upscale_tools_registered(self):
+        with tempfile.TemporaryDirectory() as d:
+            reg, guard = make_registry(Path(d))
+            register_media_tools(reg, MediaClient(guard))
+            self.assertIn("upscale_image", reg.names())
+            self.assertIn("upscale_video", reg.names())
+
+    def test_upscale_video_gif(self):
+        with tempfile.TemporaryDirectory() as d:
+            guard = Guard(Path(d))
+            gif_path = Path(d) / "clip.gif"
+            try:
+                from PIL import Image
+            except ImportError:
+                # Без Pillow: суффикс .gif проходит, но апскейл требует Pillow.
+                gif_path.write_bytes(b"GIF89a")
+                client = MediaClient(guard, save_dir="state/media")
+                with self.assertRaises(Exception) as ctx:
+                    client.upscale_video("clip.gif")
+                self.assertIn("Pillow", str(ctx.exception))
+                return
+            # С Pillow: собираем настоящий анимированный GIF и апскейлим кадры.
+            frame = Image.new("RGB", (2, 2), (10, 20, 30))
+            frame.save(gif_path, save_all=True, append_images=[frame, frame],
+                       duration=100, loop=0)
+            client = MediaClient(guard, save_dir="state/media")
+            big = base64.b64encode(
+                base64.b64decode(
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk"
+                    "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")).decode()
+            client._upscale_b64 = lambda b64, scale, upscaler: big
+            paths = client.upscale_video("clip.gif", scale=2, fps=6)
+            self.assertTrue(paths[0].exists())
+            self.assertTrue(str(paths[0]).endswith(".gif"))
+
+
 class TestConfig(unittest.TestCase):
     def test_defaults(self):
         cfg = Config.load("/nonexistent/config.yaml")
