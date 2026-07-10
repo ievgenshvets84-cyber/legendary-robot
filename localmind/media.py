@@ -70,6 +70,69 @@ class MediaClient:
             raise MediaError("Сервер изображений не вернул данных.")
         return self._save_many(images, prefix="img", ext="png")
 
+    # ── image-to-image ───────────────────────────────────────────────────
+    def image_to_image(self, prompt: str, init_image: str,
+                       negative_prompt: str = "", denoising_strength: float = 0.6,
+                       width: int | None = None, height: int | None = None,
+                       steps: int | None = None, seed: int = -1,
+                       count: int = 1) -> list[Path]:
+        """Перерисовать существующее изображение по текстовому запросу.
+
+        denoising_strength: 0.0 — почти без изменений, 1.0 — полностью заново.
+        """
+        if not self.image_host:
+            raise MediaError("Не задан media.image_host в config.yaml.")
+        payload = {
+            "init_images": [self._read_image_b64(init_image)],
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "denoising_strength": denoising_strength,
+            "steps": steps or self.steps,
+            "width": width or self.width,
+            "height": height or self.height,
+            "cfg_scale": self.cfg_scale,
+            "sampler_name": self.sampler,
+            "batch_size": max(1, count),
+            "seed": seed,
+        }
+        data = self._post(self.image_host + "/sdapi/v1/img2img", payload)
+        images = data.get("images") or []
+        if not images:
+            raise MediaError("Сервер изображений не вернул данных.")
+        return self._save_many(images, prefix="i2i", ext="png")
+
+    # ── inpainting ───────────────────────────────────────────────────────
+    def inpaint(self, prompt: str, init_image: str, mask_image: str,
+                negative_prompt: str = "", denoising_strength: float = 0.75,
+                mask_blur: int = 4, inpainting_fill: int = 1,
+                inpaint_full_res: bool = True, steps: int | None = None,
+                seed: int = -1) -> list[Path]:
+        """Перерисовать только область под маской (белое = править, чёрное = оставить).
+
+        inpainting_fill: 0=fill, 1=original, 2=latent noise, 3=latent nothing.
+        """
+        if not self.image_host:
+            raise MediaError("Не задан media.image_host в config.yaml.")
+        payload = {
+            "init_images": [self._read_image_b64(init_image)],
+            "mask": self._read_image_b64(mask_image),
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "denoising_strength": denoising_strength,
+            "mask_blur": mask_blur,
+            "inpainting_fill": inpainting_fill,
+            "inpaint_full_res": inpaint_full_res,
+            "steps": steps or self.steps,
+            "cfg_scale": self.cfg_scale,
+            "sampler_name": self.sampler,
+            "seed": seed,
+        }
+        data = self._post(self.image_host + "/sdapi/v1/img2img", payload)
+        images = data.get("images") or []
+        if not images:
+            raise MediaError("Сервер изображений не вернул данных.")
+        return self._save_many(images, prefix="inpaint", ext="png")
+
     # ── видео ────────────────────────────────────────────────────────────
     def generate_video(self, prompt: str, negative_prompt: str = "",
                         seconds: float = 2.0, fps: int = 8) -> list[Path]:
@@ -108,6 +171,13 @@ class MediaClient:
         target = self.guard.resolve_path(self.save_dir)
         target.mkdir(parents=True, exist_ok=True)
         return target
+
+    def _read_image_b64(self, path: str) -> str:
+        """Читает изображение из песочницы и кодирует в base64 для API."""
+        target = self.guard.resolve_path(path)
+        if not target.exists():
+            raise MediaError(f"Файл изображения не найден: {path}")
+        return base64.b64encode(target.read_bytes()).decode("ascii")
 
     def _save_many(self, b64_items: list[str], prefix: str, ext: str) -> list[Path]:
         out_dir = self._save_dir()
@@ -183,6 +253,49 @@ def register_media_tools(registry: ToolRegistry, media: MediaClient) -> None:
          "negative_prompt": "чего избегать (необязательно)",
          "count": "сколько картинок 1–4 (необязательно)"},
         _gen_image,
+    ))
+    def _img2img(ctx, prompt: str, init_image: str, negative_prompt: str = "",
+                 strength: str = "0.6") -> str:
+        try:
+            denoise = max(0.0, min(1.0, float(strength)))
+        except (TypeError, ValueError):
+            denoise = 0.6
+        paths = media.image_to_image(prompt, init_image=init_image,
+                                     negative_prompt=negative_prompt,
+                                     denoising_strength=denoise)
+        return "Перерисованные изображения:\n" + "\n".join(str(p) for p in paths)
+
+    def _inpaint(ctx, prompt: str, init_image: str, mask_image: str,
+                 negative_prompt: str = "", strength: str = "0.75") -> str:
+        try:
+            denoise = max(0.0, min(1.0, float(strength)))
+        except (TypeError, ValueError):
+            denoise = 0.75
+        paths = media.inpaint(prompt, init_image=init_image, mask_image=mask_image,
+                              negative_prompt=negative_prompt,
+                              denoising_strength=denoise)
+        return "Результат inpainting:\n" + "\n".join(str(p) for p in paths)
+
+    registry.register(Tool(
+        "image_to_image",
+        "Перерисовать существующее изображение по текстовому запросу "
+        "(img2img на локальной модели).",
+        {"prompt": "как изменить/что нарисовать",
+         "init_image": "путь к исходному изображению в рабочей папке",
+         "negative_prompt": "чего избегать (необязательно)",
+         "strength": "сила изменений 0.0–1.0 (необязательно)"},
+        _img2img,
+    ))
+    registry.register(Tool(
+        "inpaint_image",
+        "Перерисовать только область под маской (inpainting): белое в маске — "
+        "править, чёрное — оставить.",
+        {"prompt": "что должно появиться в области",
+         "init_image": "путь к исходному изображению",
+         "mask_image": "путь к чёрно-белой маске",
+         "negative_prompt": "чего избегать (необязательно)",
+         "strength": "сила изменений 0.0–1.0 (необязательно)"},
+        _inpaint,
     ))
     registry.register(Tool(
         "generate_video",

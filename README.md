@@ -110,12 +110,21 @@ ComfyUI со Stable Video Diffusion / AnimateDiff).
 python -m localmind media image "город будущего на закате, кинематографично" --count 2
 python -m localmind media image "портрет" --negative "размытость, лишние пальцы"
 python -m localmind media video "волны накатывают на берег" --seconds 2
+
+# image-to-image: перерисовать существующее изображение (--strength: 0=почти без
+# изменений, 1=полностью заново)
+python -m localmind media img2img "сделай зимнюю ночь" --init state/media/img.png --strength 0.55
+
+# inpainting: править только область под чёрно-белой маской
+# (белое в маске — перерисовать, чёрное — оставить)
+python -m localmind media inpaint "надеть красную шляпу" \
+    --init state/media/img.png --mask state/media/mask.png --strength 0.75
 ```
 
-Агент может вызывать генерацию сам — инструменты `generate_image` и
-`generate_video` доступны в `run`/`auto`. Файлы сохраняются в `state/media/`
-(внутри песочницы). Настройка адресов серверов — в секции `media` файла
-`config.yaml`.
+Агент может вызывать генерацию сам — инструменты `generate_image`,
+`generate_video`, `image_to_image` и `inpaint_image` доступны в `run`/`auto`.
+Файлы сохраняются в `state/media/` (внутри песочницы). Настройка адресов
+серверов — в секции `media` файла `config.yaml`.
 
 > Генерация идёт офлайн на ваших моделях — внешнего сервиса-«цензора» в этой
 > цепочке нет. При этом LocalMind **не отключает и не обходит** защитные
@@ -151,7 +160,7 @@ python -m localmind media video "волны накатывают на берег
 | `safety.py` | песочница путей и фильтр разрушительного кода |
 | `skill_manager.py` | самопрограммирование: агент пишет, проверяет и регистрирует навыки |
 | `agent.py` | цикл рассуждение→действие на JSON-протоколе (работает с любой моделью) |
-| `media.py` | локальная генерация изображений и видео на открытых моделях |
+| `media.py` | локальная генерация изображений и видео: txt2img, img2img, inpainting |
 | `autonomy.py` | автономная работа по списку целей |
 | `train.py` | опциональное дообучение весов через LoRA (нужен GPU) |
 | `cli.py` | командный интерфейс |

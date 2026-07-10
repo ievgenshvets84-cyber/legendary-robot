@@ -208,8 +208,55 @@ class TestMedia(unittest.TestCase):
             reg, guard = make_registry(Path(d))
             client = MediaClient(guard)
             register_media_tools(reg, client)
-            self.assertIn("generate_image", reg.names())
-            self.assertIn("generate_video", reg.names())
+            for name in ("generate_image", "generate_video",
+                         "image_to_image", "inpaint_image"):
+                self.assertIn(name, reg.names())
+
+    def test_img2img_reads_init_and_saves(self):
+        with tempfile.TemporaryDirectory() as d:
+            guard = Guard(Path(d))
+            (Path(d) / "src.png").write_bytes(b"\x89PNG\r\n\x1a\nINIT")
+            client = MediaClient(guard, save_dir="state/media")
+            result_png = base64.b64encode(b"\x89PNG\r\n\x1a\nOUT").decode()
+            captured = {}
+
+            def fake_post(url, payload):
+                captured["url"] = url
+                captured["payload"] = payload
+                return {"images": [result_png]}
+
+            client._post = fake_post
+            paths = client.image_to_image("сделай ночь", init_image="src.png",
+                                          denoising_strength=0.5)
+            self.assertTrue(captured["url"].endswith("/sdapi/v1/img2img"))
+            self.assertIn("init_images", captured["payload"])
+            self.assertEqual(captured["payload"]["denoising_strength"], 0.5)
+            self.assertTrue(paths[0].exists())
+
+    def test_inpaint_sends_mask(self):
+        with tempfile.TemporaryDirectory() as d:
+            guard = Guard(Path(d))
+            (Path(d) / "src.png").write_bytes(b"\x89PNG\r\n\x1a\nINIT")
+            (Path(d) / "mask.png").write_bytes(b"\x89PNG\r\n\x1a\nMASK")
+            client = MediaClient(guard, save_dir="state/media")
+            captured = {}
+
+            def fake_post(url, payload):
+                captured["payload"] = payload
+                return {"images": [base64.b64encode(b"OUT").decode()]}
+
+            client._post = fake_post
+            client.inpaint("новая область", init_image="src.png", mask_image="mask.png")
+            self.assertIn("mask", captured["payload"])
+            self.assertIn("init_images", captured["payload"])
+
+    def test_img2img_missing_init_errors(self):
+        with tempfile.TemporaryDirectory() as d:
+            guard = Guard(Path(d))
+            reg, _ = make_registry(Path(d))
+            register_media_tools(reg, MediaClient(guard))
+            out = reg.call("image_to_image", {"prompt": "x", "init_image": "нет.png"})
+            self.assertIn("не найден", out)
 
     def test_video_requires_backend(self):
         with tempfile.TemporaryDirectory() as d:

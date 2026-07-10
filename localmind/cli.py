@@ -95,13 +95,28 @@ def cmd_doctor(app: App, args: argparse.Namespace) -> int:
 
 def cmd_media(app: App, args: argparse.Namespace) -> int:
     prompt = " ".join(args.prompt)
+    neg = args.negative or ""
     try:
         if args.kind == "image":
-            paths = app.media.generate_image(prompt, negative_prompt=args.negative or "",
-                                             count=args.count)
+            paths = app.media.generate_image(prompt, negative_prompt=neg, count=args.count)
+        elif args.kind == "video":
+            paths = app.media.generate_video(prompt, negative_prompt=neg, seconds=args.seconds)
+        elif args.kind == "img2img":
+            if not args.init:
+                print("Для img2img укажите --init <путь к изображению>.")
+                return 1
+            paths = app.media.image_to_image(prompt, init_image=args.init,
+                                             negative_prompt=neg,
+                                             denoising_strength=args.strength)
+        elif args.kind == "inpaint":
+            if not args.init or not args.mask:
+                print("Для inpaint укажите --init <изображение> и --mask <маска>.")
+                return 1
+            paths = app.media.inpaint(prompt, init_image=args.init, mask_image=args.mask,
+                                      negative_prompt=neg, denoising_strength=args.strength)
         else:
-            paths = app.media.generate_video(prompt, negative_prompt=args.negative or "",
-                                             seconds=args.seconds)
+            print(f"Неизвестный режим: {args.kind}")
+            return 1
     except Exception as exc:
         print(f"Ошибка генерации: {exc}")
         return 1
@@ -246,11 +261,15 @@ def build_parser() -> argparse.ArgumentParser:
     pm.add_argument("query", nargs="*")
 
     pmd = sub.add_parser("media", help="локальная генерация изображений и видео")
-    pmd.add_argument("kind", choices=["image", "video"])
+    pmd.add_argument("kind", choices=["image", "video", "img2img", "inpaint"])
     pmd.add_argument("prompt", nargs="+", help="описание сцены")
     pmd.add_argument("--negative", help="что исключить из генерации")
     pmd.add_argument("--count", type=int, default=1, help="сколько изображений (1–4)")
     pmd.add_argument("--seconds", type=float, default=2.0, help="длительность видео")
+    pmd.add_argument("--init", help="исходное изображение (img2img/inpaint)")
+    pmd.add_argument("--mask", help="чёрно-белая маска (inpaint)")
+    pmd.add_argument("--strength", type=float, default=0.6,
+                     help="сила изменений 0.0–1.0 (img2img/inpaint)")
     return p
 
 
