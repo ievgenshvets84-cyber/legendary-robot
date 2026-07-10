@@ -13,6 +13,7 @@ from pathlib import Path
 
 from localmind.agent import Agent, _first_json_object, _parse_action
 from localmind.config import Config
+from localmind.llm import _extract_error
 from localmind.media import MediaClient, register_media_tools
 from localmind.memory import Memory, _cosine, _lexical
 from localmind.safety import Guard, SafetyError
@@ -475,6 +476,20 @@ class TestWeb(unittest.TestCase):
         self.assertIn("/api/chat", web.INDEX_HTML)
         self.assertIn("/api/media", web.INDEX_HTML)
 
+    def test_model_present(self):
+        from localmind.web import _model_present
+        self.assertTrue(_model_present("qwen2.5:7b-instruct", ["qwen2.5:7b-instruct"]))
+        self.assertTrue(_model_present("qwen2.5", ["qwen2.5:latest"]))  # тег не важен
+        self.assertFalse(_model_present("qwen2.5", ["llama3.1:8b"]))
+        self.assertFalse(_model_present("qwen2.5", []))
+
+    def test_status_reports_model_installed(self):
+        with tempfile.TemporaryDirectory() as d:
+            from localmind import web
+            app = self._stub_app(d, FakeLLM())  # installed_models -> ["test-model"]
+            st = web.status_payload(app)
+            self.assertTrue(st["model_installed"])  # cfg model == "test-model"
+
     def test_handle_media_image(self):
         with tempfile.TemporaryDirectory() as d:
             from localmind import web
@@ -512,6 +527,18 @@ class TestWeb(unittest.TestCase):
 
         out = web.handle_media(StubApp(), {"kind": "image", "prompt": ""})
         self.assertIn("error", out)
+
+
+class TestLLMErrors(unittest.TestCase):
+    def test_extract_error_json(self):
+        body = '{"error": "model \'qwen2.5\' not found, try pulling it"}'
+        self.assertIn("not found", _extract_error(body))
+
+    def test_extract_error_plain(self):
+        self.assertEqual(_extract_error("404 page not found"), "404 page not found")
+
+    def test_extract_error_empty(self):
+        self.assertEqual(_extract_error(""), "")
 
 
 class TestConfig(unittest.TestCase):

@@ -20,6 +20,9 @@ from typing import Any
 # ── чистая логика запросов (тестируется без поднятия сервера) ─────────────
 def status_payload(app: Any) -> dict[str, Any]:
     ok = app.llm.available()
+    model = app.cfg.llm["model"]
+    models = app.llm.installed_models() if ok else []
+    model_installed = ok and _model_present(model, models)
     image_ok = False
     image_host = ""
     media = getattr(app, "media", None)
@@ -32,14 +35,24 @@ def status_payload(app: Any) -> dict[str, Any]:
     return {
         "ollama": ok,
         "host": app.cfg.llm["host"],
-        "model": app.cfg.llm["model"],
-        "models": app.llm.installed_models() if ok else [],
+        "model": model,
+        "models": models,
+        "model_installed": model_installed,
         "tools": app.registry.names(),
         "skills": list(app.loaded_skills),
         "memory": app.memory.stats(),
         "image_server": image_ok,
         "image_host": image_host,
     }
+
+
+def _model_present(model: str, installed: list) -> bool:
+    """Модель считается установленной при точном совпадении или совпадении
+    базового имени (без тега), т.к. 'qwen2.5' и 'qwen2.5:latest' — одно и то же."""
+    if model in installed:
+        return True
+    base = model.split(":", 1)[0]
+    return any(m.split(":", 1)[0] == base for m in installed)
 
 
 def handle_chat(app: Any, state: dict[str, Any], data: dict[str, Any]) -> dict[str, Any]:
@@ -451,7 +464,15 @@ function updateBanner(){
   if(j.ollama === true){
     st.innerHTML = '<span class="dot ok"></span>Ollama · '+j.model;
   }
-  // 2) В режиме «Медиа» подсказываем про отдельный сервер картинок.
+  // 2) Ollama работает, но нужная модель не установлена → 404 при запросе.
+  if(j.ollama === true && j.model_installed === false){
+    warn.style.display="block";
+    warn.innerHTML = 'Ollama запущен, но модель <b>'+j.model+'</b> не установлена '+
+      '(поэтому запросы падают с 404). Выполните в PowerShell: '+
+      '<code>ollama pull '+j.model+'</code> — затем страница подхватит модель сама.';
+    return;
+  }
+  // 3) В режиме «Медиа» подсказываем про отдельный сервер картинок.
   if(mode==="media" && j.image_server === false){
     warn.style.display="block";
     warn.innerHTML = 'Для генерации картинок нужен ОТДЕЛЬНЫЙ сервер '+

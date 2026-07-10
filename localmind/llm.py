@@ -112,12 +112,34 @@ class LLMClient:
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raise self._http_error(exc) from exc
         except urllib.error.URLError as exc:
             raise LLMError(
                 f"Не удаётся связаться с Ollama на {self.host}. "
                 "Запустите `ollama serve` и убедитесь, что модель загружена. "
                 f"Причина: {exc}"
             ) from exc
+
+    def _http_error(self, exc: "urllib.error.HTTPError") -> LLMError:
+        """Различает «сервер не запущен» и «модель не установлена» (404)."""
+        body = ""
+        try:
+            body = exc.read().decode("utf-8", "replace")
+        except Exception:
+            pass
+        detail = _extract_error(body)
+        if exc.code == 404:
+            return LLMError(
+                f"Ollama запущен, но вернул 404 для модели '{self.model}'. "
+                f"Чаще всего это значит, что модель не установлена — выполните:\n"
+                f"    ollama pull {self.model}\n"
+                + (f"Ответ сервера: {detail}" if detail else "")
+            )
+        return LLMError(
+            f"Ollama вернул HTTP {exc.code}."
+            + (f" Ответ: {detail}" if detail else "")
+        )
 
     def _post_stream(self, path: str, payload: dict[str, Any]) -> Iterable[dict[str, Any]]:
         body = json.dumps(payload).encode("utf-8")
@@ -131,5 +153,21 @@ class LLMClient:
                     line = line.strip()
                     if line:
                         yield json.loads(line.decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raise self._http_error(exc) from exc
         except urllib.error.URLError as exc:
             raise LLMError(f"Ошибка потокового запроса к Ollama: {exc}") from exc
+
+
+def _extract_error(body: str) -> str:
+    """Достаёт поле error из JSON-ответа Ollama, иначе обрезанное тело."""
+    body = (body or "").strip()
+    if not body:
+        return ""
+    try:
+        obj = json.loads(body)
+        if isinstance(obj, dict) and obj.get("error"):
+            return str(obj["error"])
+    except json.JSONDecodeError:
+        pass
+    return body[:300]
