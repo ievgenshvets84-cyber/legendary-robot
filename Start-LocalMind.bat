@@ -35,6 +35,11 @@ REM --- Web-Oberflaeche starten (oeffnet Browser) / веб-интерфейс (�
 echo Starte LocalMind Web-UI... / Запускаю веб-интерфейс LocalMind...
 echo Zum Beenden dieses Fenster schliessen. / Чтобы остановить - закройте это окно.
 echo.
+echo Hinweis: Chat und Agent laufen sofort. Fuer Bildgenerierung (Modus "Медиа")
+echo   braucht es einen SEPARATEN Stable-Diffusion-Server auf Port 7860
+echo   (Automatic1111 / SD.Next mit --api) - siehe Abschnitt "Медиа" in README.
+echo   Примечание: для генерации картинок нужен отдельный сервер Stable Diffusion.
+echo.
 python -m localmind web
 
 pause

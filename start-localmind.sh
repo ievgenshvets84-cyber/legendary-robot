@@ -18,4 +18,6 @@ fi
 
 cd "$(dirname "$0")"
 echo "Запускаю веб-интерфейс LocalMind… (Ctrl+C — стоп)"
+echo "Примечание: чат и агент работают сразу. Для генерации картинок (режим «Медиа»)"
+echo "  нужен отдельный сервер Stable Diffusion на порту 7860 (Automatic1111 --api)."
 exec python3 -m localmind web

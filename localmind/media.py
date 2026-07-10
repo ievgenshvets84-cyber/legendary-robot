@@ -331,9 +331,16 @@ class MediaClient:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.URLError as exc:
+            is_image = "sdapi" in url
+            what = ("Stable Diffusion для картинок" if is_image
+                    else "видео-бэкенд")
+            fix = ("запустите Automatic1111/SD.Next с флагом --api (порт 7860)"
+                   if is_image else "запустите локальный видео-сервер (ComfyUI/SVD)")
             raise MediaError(
-                f"Не удаётся связаться с локальным медиа-сервером ({url}). "
-                f"Убедитесь, что он запущен. Причина: {exc}"
+                f"Нет связи с сервером генерации по адресу {url}. "
+                f"Это ОТДЕЛЬНЫЙ локальный сервер ({what}), а НЕ Ollama — "
+                f"он не запускается автоматически. Чтобы генерировать медиа, {fix}; "
+                f"подробности в разделе «Медиа» в README. Причина: {exc}"
             ) from exc
 
     def _ping(self, url: str) -> bool:

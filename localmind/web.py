@@ -20,6 +20,15 @@ from typing import Any
 # ── чистая логика запросов (тестируется без поднятия сервера) ─────────────
 def status_payload(app: Any) -> dict[str, Any]:
     ok = app.llm.available()
+    image_ok = False
+    image_host = ""
+    media = getattr(app, "media", None)
+    if media is not None:
+        image_host = getattr(media, "image_host", "")
+        try:
+            image_ok = media.image_available()
+        except Exception:
+            image_ok = False
     return {
         "ollama": ok,
         "host": app.cfg.llm["host"],
@@ -28,6 +37,8 @@ def status_payload(app: Any) -> dict[str, Any]:
         "tools": app.registry.names(),
         "skills": list(app.loaded_skills),
         "memory": app.memory.stats(),
+        "image_server": image_ok,
+        "image_host": image_host,
     }
 
 
@@ -333,6 +344,7 @@ function setMode(m){
   document.getElementById("hint").textContent = m==="media"
     ? "Режим «Медиа»: опишите картинку и нажмите Отправить. У готовых картинок есть кнопки Апскейл и Оживить."
     : "Режим «Чат» — обычный диалог. Режим «Агент» — задача с инструментами и памятью.";
+  updateBanner();
 }
 input.addEventListener("input", ()=>{ input.style.height="auto"; input.style.height=Math.min(input.scrollHeight,160)+"px"; });
 input.addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); }});
@@ -422,21 +434,38 @@ async function resetChat(){
   await fetch("/api/reset",{method:"POST"});
   messages.innerHTML=""; input.focus();
 }
+let lastStatus = {};
+function updateBanner(){
+  const st = document.getElementById("status");
+  const warn = document.getElementById("warn");
+  const j = lastStatus;
+  // 1) Ollama важнее всего: без него не работают чат и агент.
+  if(j.ollama === false){
+    st.innerHTML = '<span class="dot bad"></span>Ollama не подключён';
+    warn.style.display="block";
+    warn.innerHTML = 'Нет связи с Ollama. Откройте PowerShell и запустите: '+
+      '<code>ollama serve</code> — затем страница подхватит связь сама. '+
+      'Модель ставится командой <code>ollama pull '+(j.model||'')+'</code>.';
+    return;
+  }
+  if(j.ollama === true){
+    st.innerHTML = '<span class="dot ok"></span>Ollama · '+j.model;
+  }
+  // 2) В режиме «Медиа» подсказываем про отдельный сервер картинок.
+  if(mode==="media" && j.image_server === false){
+    warn.style.display="block";
+    warn.innerHTML = 'Для генерации картинок нужен ОТДЕЛЬНЫЙ сервер '+
+      '<b>Stable Diffusion</b> ('+(j.image_host||'http://localhost:7860')+'), это НЕ Ollama. '+
+      'Запустите Automatic1111/SD.Next с флагом <code>--api</code> — см. раздел «Медиа» в README. '+
+      'Чат и Агент работают без него.';
+  } else {
+    warn.style.display="none";
+  }
+}
 async function refreshStatus(){
   try {
-    const j = await (await fetch("/api/status")).json();
-    const st = document.getElementById("status");
-    const warn = document.getElementById("warn");
-    if(j.ollama){
-      st.innerHTML = '<span class="dot ok"></span>Ollama · '+j.model;
-      warn.style.display="none";
-    } else {
-      st.innerHTML = '<span class="dot bad"></span>Ollama не подключён';
-      warn.style.display="block";
-      warn.innerHTML = 'Нет связи с Ollama. Откройте PowerShell и запустите: '+
-        '<code>ollama serve</code> — затем страница подхватит связь сама. '+
-        'Модель ставится командой <code>ollama pull '+j.model+'</code>.';
-    }
+    lastStatus = await (await fetch("/api/status")).json();
+    updateBanner();
   } catch(e){ /* сервер перезапускается */ }
 }
 refreshStatus(); setInterval(refreshStatus, 5000); input.focus();

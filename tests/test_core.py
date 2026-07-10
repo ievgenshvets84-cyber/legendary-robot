@@ -414,6 +414,12 @@ class TestWeb(unittest.TestCase):
                     on_event("action", "read_file(...)")
                 return f"выполнено: {task}"
 
+        class StubMedia:
+            image_host = "http://localhost:7860"
+
+            def image_available(self):
+                return False
+
         class StubApp:
             pass
 
@@ -424,6 +430,7 @@ class TestWeb(unittest.TestCase):
         app.agent = StubAgent()
         app.loaded_skills = ["word_count"]
         app.cfg = StubCfg()
+        app.media = StubMedia()
         return app
 
     def test_status_payload(self):
@@ -434,6 +441,8 @@ class TestWeb(unittest.TestCase):
             self.assertIn("ollama", st)
             self.assertEqual(st["model"], "test-model")
             self.assertIn("word_count", st["skills"])
+            self.assertFalse(st["image_server"])
+            self.assertEqual(st["image_host"], "http://localhost:7860")
 
     def test_handle_chat(self):
         with tempfile.TemporaryDirectory() as d:
