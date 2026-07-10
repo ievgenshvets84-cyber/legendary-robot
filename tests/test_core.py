@@ -39,6 +39,9 @@ class FakeLLM:
     def available(self):
         return True
 
+    def installed_models(self):
+        return ["test-model"]
+
 
 def make_registry(tmp: Path) -> tuple[ToolRegistry, Guard]:
     guard = Guard(tmp, allow_shell=False)
@@ -393,6 +396,74 @@ class TestMedia(unittest.TestCase):
             paths = client.upscale_video("clip.gif", scale=2, fps=6)
             self.assertTrue(paths[0].exists())
             self.assertTrue(str(paths[0]).endswith(".gif"))
+
+
+class TestWeb(unittest.TestCase):
+    def _stub_app(self, d, llm):
+        guard = Guard(Path(d))
+        ctx = ToolContext(guard=guard, memory=None, llm=None, sandbox_timeout=5)
+        reg = ToolRegistry(ctx)
+        mem = Memory(Path(d) / "m.jsonl", llm)
+
+        class StubCfg:
+            llm = {"host": "http://localhost:11434", "model": "test-model"}
+
+        class StubAgent:
+            def run(self, task, on_event=None):
+                if on_event:
+                    on_event("action", "read_file(...)")
+                return f"выполнено: {task}"
+
+        class StubApp:
+            pass
+
+        app = StubApp()
+        app.llm = llm
+        app.memory = mem
+        app.registry = reg
+        app.agent = StubAgent()
+        app.loaded_skills = ["word_count"]
+        app.cfg = StubCfg()
+        return app
+
+    def test_status_payload(self):
+        with tempfile.TemporaryDirectory() as d:
+            from localmind import web
+            app = self._stub_app(d, FakeLLM())
+            st = web.status_payload(app)
+            self.assertIn("ollama", st)
+            self.assertEqual(st["model"], "test-model")
+            self.assertIn("word_count", st["skills"])
+
+    def test_handle_chat(self):
+        with tempfile.TemporaryDirectory() as d:
+            from localmind import web
+            app = self._stub_app(d, FakeLLM(["Привет! Чем помочь?"]))
+            state = web.new_state()
+            out = web.handle_chat(app, state, {"message": "привет"})
+            self.assertEqual(out["reply"], "Привет! Чем помочь?")
+            # чистое сообщение пользователя сохранено в истории
+            self.assertEqual(state["history"][-2], {"role": "user", "content": "привет"})
+
+    def test_handle_chat_empty(self):
+        with tempfile.TemporaryDirectory() as d:
+            from localmind import web
+            app = self._stub_app(d, FakeLLM())
+            out = web.handle_chat(app, web.new_state(), {"message": "  "})
+            self.assertIn("error", out)
+
+    def test_handle_agent(self):
+        with tempfile.TemporaryDirectory() as d:
+            from localmind import web
+            app = self._stub_app(d, FakeLLM())
+            out = web.handle_agent(app, {"task": "сделай отчёт"})
+            self.assertEqual(out["result"], "выполнено: сделай отчёт")
+            self.assertTrue(any(e["kind"] == "action" for e in out["events"]))
+
+    def test_index_html_present(self):
+        from localmind import web
+        self.assertIn("LocalMind", web.INDEX_HTML)
+        self.assertIn("/api/chat", web.INDEX_HTML)
 
 
 class TestConfig(unittest.TestCase):

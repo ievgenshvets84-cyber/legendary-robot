@@ -247,6 +247,12 @@ def cmd_skills(app: App, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_web(app: App, args: argparse.Namespace) -> int:
+    from .web import serve
+    serve(app, host=args.host, port=args.port, open_browser=not args.no_browser)
+    return 0
+
+
 def cmd_memory(app: App, args: argparse.Namespace) -> int:
     if args.action == "stats":
         print(app.memory.stats())
@@ -268,6 +274,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("doctor", help="проверить окружение и модели")
     sub.add_parser("chat", help="интерактивный диалог")
+
+    pw = sub.add_parser("web", help="браузерный интерфейс (чат + агент)")
+    pw.add_argument("--host", default="127.0.0.1")
+    pw.add_argument("--port", type=int, default=8770)
+    pw.add_argument("--no-browser", action="store_true",
+                    help="не открывать браузер автоматически")
 
     pr = sub.add_parser("run", help="выполнить одну задачу агентом")
     pr.add_argument("task", nargs="+")
@@ -307,7 +319,7 @@ def build_parser() -> argparse.ArgumentParser:
 COMMANDS = {
     "doctor": cmd_doctor, "chat": cmd_chat, "run": cmd_run,
     "auto": cmd_auto, "skills": cmd_skills, "memory": cmd_memory,
-    "media": cmd_media,
+    "media": cmd_media, "web": cmd_web,
 }
 
 
