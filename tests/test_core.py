@@ -145,6 +145,14 @@ class TestSkills(unittest.TestCase):
             result = mgr.author("сделай что-то опасное")
             self.assertEqual(result["status"], "rejected")
 
+    def test_approve_rejects_path_traversal(self):
+        with tempfile.TemporaryDirectory() as d:
+            reg, guard = make_registry(Path(d))
+            mgr = SkillManager(Path(d) / "skills", reg, guard, FakeLLM())
+            self.assertIn("Некорректное имя", mgr.approve("../evil.py"))
+            self.assertIn("Некорректное имя", mgr.approve("sub/dir.py"))
+            self.assertIn("Некорректное имя", mgr.approve(".hidden.py"))
+
     def test_author_pending_requires_approval(self):
         with tempfile.TemporaryDirectory() as d:
             reg, guard = make_registry(Path(d))

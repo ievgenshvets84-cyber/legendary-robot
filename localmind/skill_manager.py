@@ -79,6 +79,8 @@ class SkillManager:
 
     def approve(self, filename: str) -> str:
         """Переносит навык из pending/ в активную папку и регистрирует его."""
+        if Path(filename).name != filename or filename.startswith("."):
+            return f"Некорректное имя файла навыка: {filename}"
         src = self.pending / filename
         if not src.exists():
             return f"Нет ожидающего навыка: {filename}"

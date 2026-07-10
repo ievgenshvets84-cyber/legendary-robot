@@ -238,7 +238,8 @@ def cmd_skills(app: App, args: argparse.Namespace) -> int:
             return 1
         print(app.skills.approve(args.name))
     elif args.action == "new":
-        desc = " ".join(args.name_parts) if args.name_parts else args.name or ""
+        parts = ([args.name] if args.name else []) + list(args.name_parts or [])
+        desc = " ".join(parts)
         if not desc:
             print("Опишите, что должен делать навык.")
             return 1

@@ -69,8 +69,23 @@ def handle_chat(app: Any, state: dict[str, Any], data: dict[str, Any]) -> dict[s
     # В историю кладём чистое сообщение пользователя (без блока воспоминаний).
     state["history"].append({"role": "user", "content": message})
     state["history"].append({"role": "assistant", "content": reply})
+    _trim_history(state)
     app.memory.add(f"Пользователь: {message}\nОтвет: {reply}", kind="dialog")
     return {"reply": reply}
+
+
+MAX_HISTORY_TURNS = 40  # реплик (без системного сообщения)
+
+
+def _trim_history(state: dict[str, Any]) -> None:
+    """Не даёт истории чата разрастись за пределы контекста модели.
+
+    Системное сообщение сохраняется, старые реплики отбрасываются; давние
+    факты агент всё равно достаёт из долговременной памяти (RAG).
+    """
+    history = state["history"]
+    if len(history) - 1 > MAX_HISTORY_TURNS:
+        state["history"] = [history[0]] + history[-MAX_HISTORY_TURNS:]
 
 
 def handle_agent(app: Any, data: dict[str, Any]) -> dict[str, Any]:
