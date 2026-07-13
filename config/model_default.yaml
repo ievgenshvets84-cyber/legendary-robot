@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------------------
+# LLM-Forge – Standard-Modellarchitektur
+#
+# Diese Datei beschreibt die Architektur eines neuen, eigenständigen Modells.
+# Die Werte sind bewusst klein gewählt, damit ein erstes Training auch auf
+# einer einzelnen Consumer-GPU (oder CPU) möglich ist. Für größere Modelle
+# einfach die Werte erhöhen – die Architektur skaliert ohne Codeänderung.
+# ---------------------------------------------------------------------------
+name: "forge-base"
+
+# Vokabulargröße des eigenen Tokenizers (wird beim Tokenizer-Training festgelegt)
+vocab_size: 8192
+
+# Transformer-Dimensionen
+hidden_size: 512          # Breite der Embeddings / Residual-Ströme
+num_layers: 8             # Anzahl der Decoder-Blöcke
+num_heads: 8              # Query-Köpfe der Attention
+num_kv_heads: 4           # Key/Value-Köpfe (num_kv_heads < num_heads => Grouped Query Attention)
+intermediate_size: 1536   # Innere Dimension des GeGLU-Feed-Forward
+
+# Kontext
+max_seq_len: 1024         # Maximale Kontextlänge in Token
+rope_theta: 10000.0       # Basisfrequenz der Rotary Positional Embeddings
+
+# Regularisierung / Normalisierung
+dropout: 0.0              # Dropout auf Attention- und FFN-Ausgaben
+rms_norm_eps: 1.0e-5      # Epsilon der RMSNorm
+
+# Gewichtsbindung zwischen Eingabe-Embedding und Ausgabeprojektion
+tie_word_embeddings: true

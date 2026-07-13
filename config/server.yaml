@@ -1,0 +1,17 @@
+# ---------------------------------------------------------------------------
+# LLM-Forge – Serverkonfiguration (FastAPI)
+# ---------------------------------------------------------------------------
+host: "0.0.0.0"
+port: 8000
+
+# Pfad der SQLite-Datenbank (Konfigurationen, Trainingsverläufe, Metriken)
+database: "config/llm_forge.db"
+
+# Verzeichnisse
+datasets_dir: "datasets"
+checkpoints_dir: "checkpoints"
+exports_dir: "exports"
+logs_dir: "logs"
+
+# Maximale Uploadgröße für Datensätze in MB
+max_upload_mb: 2048
