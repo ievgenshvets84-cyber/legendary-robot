@@ -1,34 +1,39 @@
-# Gradle files
-.gradle/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
 build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Local configuration file (sdk path, etc)
-local.properties
+# Projektdaten (werden zur Laufzeit erzeugt)
+datasets/raw/*
+datasets/processed/*
+checkpoints/*
+exports/*
+logs/*
+config/runtime/*
+tokenizer/trained/*
+*.db
+*.sqlite3
 
-# Log/OS Files
-*.log
+# Platzhalter behalten
+!datasets/raw/.gitkeep
+!datasets/processed/.gitkeep
+!checkpoints/.gitkeep
+!exports/.gitkeep
+!logs/.gitkeep
+!tokenizer/trained/.gitkeep
 
-# Android Studio generated files and folders
-captures/
-.externalNativeBuild/
-.cxx/
-*.aab
-*.apk
-output-metadata.json
-
-# IntelliJ
-*.iml
+# OS / IDE
+.DS_Store
 .idea/
-misc.xml
-deploymentTargetDropDown.xml
-render.experimental.xml
-
-# Keystore files
-*.jks
-*.keystore
-
-# Google Services (e.g. APIs or Firebase)
-google-services.json
-
-# Android Profiling
-*.hprof
+.vscode/
+*.iml

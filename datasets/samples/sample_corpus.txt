@@ -1,0 +1,41 @@
+Das Sprachmodell lernt, Wörter und Sätze vorherzusagen.
+Ein Transformer besteht aus mehreren Schichten mit Aufmerksamkeit.
+Aufmerksamkeit erlaubt es dem Modell, wichtige Wörter zu gewichten.
+Rotary Positional Embeddings kodieren die Reihenfolge der Token.
+RMSNorm stabilisiert das Training tiefer neuronaler Netze.
+Grouped Query Attention spart Speicher bei der Inferenz.
+Das Feed-Forward-Netz nutzt eine GeGLU-Aktivierung.
+Residualverbindungen helfen den Gradienten, tief zu fließen.
+Der Tokenizer zerlegt Text in kleine, wiederverwendbare Einheiten.
+Byte-Pair-Encoding verschmilzt häufige Zeichenpaare zu neuen Symbolen.
+Das Modell wird mit vielen Textbeispielen trainiert.
+Beim Training wird der Vorhersagefehler Schritt für Schritt reduziert.
+Ein niedriger Verlust bedeutet bessere Vorhersagen.
+Die Perplexität misst, wie überrascht das Modell vom Text ist.
+Nach dem Training kann das Modell neue Sätze erzeugen.
+Fine-Tuning passt ein Modell an eine spezielle Aufgabe an.
+LoRA trainiert nur wenige zusätzliche Parameter.
+Quantisierung verkleinert das Modell für den Einsatz.
+Der Export erlaubt die Nutzung in anderen Programmen.
+Künstliche Intelligenz verändert die Art, wie wir arbeiten.
+Sprache ist ein Fenster zum Denken des Menschen.
+Modelle lernen Muster aus großen Datenmengen.
+Jedes Token trägt ein Stück Bedeutung in sich.
+Das Netzwerk gewichtet Kontext über viele Positionen hinweg.
+Training braucht Geduld, Daten und Rechenleistung.
+Ein gutes Modell verallgemeinert über die Trainingsdaten hinaus.
+Wörter im Kontext ergeben zusammen einen Sinn.
+Der Decoder erzeugt Text von links nach rechts.
+Wahrscheinlichkeiten bestimmen das nächste Wort.
+Temperatur steuert die Kreativität der Ausgabe.
+Mit kleiner Temperatur wird das Modell vorhersehbarer.
+Große Modelle brauchen große Datensätze zum Lernen.
+Die Architektur bestimmt die Fähigkeiten des Modells.
+Embeddings bilden Wörter auf Vektoren ab.
+Vektoren im Raum stehen für semantische Nähe.
+Das Ziel ist ein transparentes und erweiterbares System.
+Offene Modelle dienen hier nur als technische Referenz.
+Die Gewichte dieses Modells sind vollständig eigen.
+Von Grund auf gebaut, Schicht für Schicht.
+Lernen bedeutet, aus Fehlern besser zu werden.
+Am Ende steht ein eigenes, funktionierendes Sprachmodell.

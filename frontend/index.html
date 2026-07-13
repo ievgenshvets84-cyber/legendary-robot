@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM-Forge – Eigenes Sprachmodell entwickeln</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <span class="logo">🔥</span>
+            <div>
+                <h1>LLM-Forge</h1>
+                <p class="tagline">Ein eigenes großes Sprachmodell von Grund auf</p>
+            </div>
+        </div>
+        <div class="system-badges" id="systemBadges">
+            <span class="badge" id="deviceBadge">Gerät: –</span>
+            <span class="badge" id="torchBadge">PyTorch: –</span>
+        </div>
+    </header>
+
+    <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="models">1 · Modell</button>
+        <button class="tab" data-tab="data">2 · Daten &amp; Tokenizer</button>
+        <button class="tab" data-tab="training">3 · Training</button>
+        <button class="tab" data-tab="chat">4 · Chat &amp; Test</button>
+        <button class="tab" data-tab="tools">5 · Bewertung &amp; Export</button>
+    </nav>
+
+    <main>
+        <!-- ============ Modell ============ -->
+        <section class="panel active" id="tab-models">
+            <div class="grid">
+                <div class="card">
+                    <h2>Neues Modell erstellen</h2>
+                    <p class="hint">Konfiguriere die Architektur deines eigenständigen Decoder-Transformers.</p>
+                    <form id="modelForm" class="form">
+                        <label>Modellname
+                            <input type="text" id="m_name" value="forge-mini" required>
+                        </label>
+                        <div class="row">
+                            <label>Hidden Size
+                                <input type="number" id="m_hidden" value="256" min="32" step="32">
+                            </label>
+                            <label>Layer
+                                <input type="number" id="m_layers" value="6" min="1">
+                            </label>
+                        </div>
+                        <div class="row">
+                            <label>Attention Heads
+                                <input type="number" id="m_heads" value="8" min="1">
+                            </label>
+                            <label>KV Heads (GQA)
+                                <input type="number" id="m_kv" value="4" min="1">
+                            </label>
+                        </div>
+                        <div class="row">
+                            <label>FFN-Größe
+                                <input type="number" id="m_ffn" value="768" min="32">
+                            </label>
+                            <label>Kontextlänge
+                                <input type="number" id="m_ctx" value="512" min="8">
+                            </label>
+                        </div>
+                        <div class="row">
+                            <label>Vokabulargröße
+                                <input type="number" id="m_vocab" value="8192" min="256">
+                            </label>
+                            <label>RoPE Theta
+                                <input type="number" id="m_theta" value="10000" min="1">
+                            </label>
+                        </div>
+                        <label class="checkbox">
+                            <input type="checkbox" id="m_tie" checked> Embedding-Gewichte binden
+                        </label>
+                        <div class="estimate" id="paramEstimate">Geschätzte Parameter: –</div>
+                        <button type="submit" class="btn primary">Modell anlegen</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Vorhandene Modelle</h2>
+                    <button class="btn ghost small" id="refreshModels">Aktualisieren</button>
+                    <div id="modelList" class="list"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ Daten & Tokenizer ============ -->
+        <section class="panel" id="tab-data">
+            <div class="grid">
+                <div class="card">
+                    <h2>Datensätze hochladen</h2>
+                    <p class="hint">Textdateien (<code>.txt</code>) oder Zeilen-JSON (<code>.jsonl</code> mit Feld <code>text</code>).</p>
+                    <input type="file" id="datasetFile" accept=".txt,.jsonl">
+                    <button class="btn primary" id="uploadBtn">Hochladen</button>
+                    <div id="datasetList" class="list"></div>
+                </div>
+
+                <div class="card">
+                    <h2>Tokenizer trainieren</h2>
+                    <p class="hint">Eigener Byte-Level-BPE-Tokenizer auf dem hochgeladenen Korpus.</p>
+                    <form id="tokenizerForm" class="form">
+                        <label>Modell
+                            <select id="tk_model"></select>
+                        </label>
+                        <div class="row">
+                            <label>Vokabulargröße
+                                <input type="number" id="tk_vocab" value="8192" min="260">
+                            </label>
+                            <label>Mindesthäufigkeit
+                                <input type="number" id="tk_minfreq" value="2" min="1">
+                            </label>
+                        </div>
+                        <button type="submit" class="btn primary">Tokenizer trainieren</button>
+                    </form>
+                    <div id="tokenizerResult" class="result"></div>
+                    <hr>
+                    <h3>Datensatz aufbereiten</h3>
+                    <p class="hint">Bereinigt und tokenisiert den Korpus in einen gepackten Token-Strom.</p>
+                    <button class="btn secondary" id="prepareBtn">Bereinigen &amp; Tokenisieren</button>
+                    <div id="prepareResult" class="result"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ Training ============ -->
+        <section class="panel" id="tab-training">
+            <div class="grid">
+                <div class="card">
+                    <h2>Training konfigurieren</h2>
+                    <form id="trainForm" class="form">
+                        <label>Modell
+                            <select id="tr_model"></select>
+                        </label>
+                        <div class="row">
+                            <label>Lernrate
+                                <input type="number" id="tr_lr" value="0.0003" step="0.0001">
+                            </label>
+                            <label>Schritte
+                                <input type="number" id="tr_steps" value="500" min="1">
+                            </label>
+                        </div>
+                        <div class="row">
+                            <label>Batchgröße
+                                <input type="number" id="tr_batch" value="8" min="1">
+                            </label>
+                            <label>Grad-Akkumulation
+                                <input type="number" id="tr_accum" value="2" min="1">
+                            </label>
+                        </div>
+                        <div class="row">
+                            <label>Sequenzlänge
+                                <input type="number" id="tr_seq" value="256" min="8">
+                            </label>
+                            <label>Gerät
+                                <select id="tr_device">
+                                    <option value="auto">auto</option>
+                                    <option value="cuda">cuda</option>
+                                    <option value="cpu">cpu</option>
+                                </select>
+                            </label>
+                        </div>
+                        <label class="checkbox">
+                            <input type="checkbox" id="tr_lora"> LoRA-Fine-Tuning verwenden
+                        </label>
+                        <div class="controls">
+                            <button type="submit" class="btn primary">Start</button>
+                            <button type="button" class="btn secondary" id="pauseBtn">Pause</button>
+                            <button type="button" class="btn secondary" id="resumeBtn">Fortsetzen</button>
+                            <button type="button" class="btn danger" id="stopBtn">Stopp</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2>Live-Fortschritt</h2>
+                    <div class="stat-row">
+                        <div class="stat"><span class="stat-label">Status</span><span class="stat-value" id="st_status">idle</span></div>
+                        <div class="stat"><span class="stat-label">Schritt</span><span class="stat-value" id="st_step">0</span></div>
+                        <div class="stat"><span class="stat-label">Loss</span><span class="stat-value" id="st_loss">–</span></div>
+                        <div class="stat"><span class="stat-label">Val-Loss</span><span class="stat-value" id="st_val">–</span></div>
+                        <div class="stat"><span class="stat-label">Tok/s</span><span class="stat-value" id="st_tps">–</span></div>
+                    </div>
+                    <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+                    <canvas id="lossChart" height="220"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>GPU-Auslastung</h2>
+                <div id="gpuInfo" class="gpu-info">Keine GPU erkannt (CPU-Modus).</div>
+            </div>
+        </section>
+
+        <!-- ============ Chat ============ -->
+        <section class="panel" id="tab-chat">
+            <div class="card chat-card">
+                <div class="chat-config">
+                    <label>Modell
+                        <select id="chat_model"></select>
+                    </label>
+                    <label>Checkpoint
+                        <select id="chat_ckpt">
+                            <option value="best">best</option>
+                            <option value="latest">latest</option>
+                        </select>
+                    </label>
+                    <label>Temperatur
+                        <input type="number" id="chat_temp" value="0.8" step="0.1" min="0" max="5">
+                    </label>
+                    <label>Max. Token
+                        <input type="number" id="chat_max" value="200" min="1">
+                    </label>
+                </div>
+                <div id="chatWindow" class="chat-window"></div>
+                <form id="chatForm" class="chat-input">
+                    <textarea id="chatPrompt" placeholder="Nachricht eingeben …" rows="2"></textarea>
+                    <button type="submit" class="btn primary">Senden</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ============ Bewertung & Export ============ -->
+        <section class="panel" id="tab-tools">
+            <div class="grid">
+                <div class="card">
+                    <h2>Modellbewertung</h2>
+                    <p class="hint">Berechnet Verlust und Perplexität auf dem Datensatz.</p>
+                    <label>Modell
+                        <select id="ev_model"></select>
+                    </label>
+                    <button class="btn primary" id="evalBtn">Bewerten</button>
+                    <div id="evalResult" class="result"></div>
+                </div>
+
+                <div class="card">
+                    <h2>Quantisierung</h2>
+                    <p class="hint">Reduziert den Speicherbedarf (4/8 Bit).</p>
+                    <label>Modell
+                        <select id="qz_model"></select>
+                    </label>
+                    <label>Bit-Breite
+                        <select id="qz_bits">
+                            <option value="8">8 Bit</option>
+                            <option value="4">4 Bit</option>
+                        </select>
+                    </label>
+                    <button class="btn primary" id="quantBtn">Quantisieren</button>
+                    <div id="quantResult" class="result"></div>
+                </div>
+
+                <div class="card">
+                    <h2>Export</h2>
+                    <p class="hint">Exportiert das Modell für andere Laufzeiten.</p>
+                    <label>Modell
+                        <select id="ex_model"></select>
+                    </label>
+                    <label>Format
+                        <select id="ex_format">
+                            <option value="onnx">ONNX</option>
+                            <option value="gguf">GGUF</option>
+                        </select>
+                    </label>
+                    <button class="btn primary" id="exportBtn">Exportieren</button>
+                    <div id="exportResult" class="result"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast" class="toast"></div>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/chart.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

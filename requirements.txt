@@ -1,0 +1,23 @@
+# Kernabhängigkeiten von LLM-Forge
+# Installation:  pip install -r requirements.txt
+# GPU-Hinweis:   Für CUDA-Unterstützung ggf. die passende Torch-Version installieren, z. B.:
+#                pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+torch>=2.3
+numpy>=1.26
+fastapi>=0.111
+uvicorn[standard]>=0.30
+pydantic>=2.7
+PyYAML>=6.0
+python-multipart>=0.0.9
+aiofiles>=23.0
+
+# Optional: ONNX-Export
+onnx>=1.16
+
+# Optional: GPU-Telemetrie im Webinterface
+nvidia-ml-py>=12.0
+
+# Entwicklung / Tests
+pytest>=8.0
+httpx>=0.27
